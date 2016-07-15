@@ -38,14 +38,29 @@ public class Config {
         this.codec = codec;
     }
 
+    /**
+     * 큐 이름을 지정한다.
+     * default name : default
+     * @param name 큐 폴더 이름
+     */
     public void setName(String name) {
         this.name = name;
     }
 
+    /**
+     * 큐 폴더가 생성될 위치를 지정한다.<br>
+     * BaseDir 밑에 큐 폴더가 생성된다.
+     * @param baseDir 큐가 저장될 폴더 위치
+     */
     public void setBaseDir(String baseDir) {
         this.baseDir = baseDir;
     }
 
+    /**
+     * 저장될 메시지의 평균 길이를 입력한다.
+     * 평균길이를 활용하여 BlockGroup에서 사용될 버퍼의 크기를 정한다.
+     * @param msgAvgLen
+     */
     public void setMsgAvgLen(int msgAvgLen) {
         this.msgAvgLen = msgAvgLen;
     }

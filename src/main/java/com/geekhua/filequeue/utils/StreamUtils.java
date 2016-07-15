@@ -9,21 +9,25 @@ import java.io.RandomAccessFile;
  * 
  */
 public class StreamUtils {
-    public static int readFully(RandomAccessFile file, byte[] b, int off, int len) throws IOException {
-        if (len < 0) {
-            throw new IndexOutOfBoundsException();
-        }
+	public static int readFully(RandomAccessFile _file, byte[] _b, int _off, int _len) throws IOException 
+	{
+		if(_len < 0) 
+		{
+			throw new IndexOutOfBoundsException();
+		}
 
-        int n = 0;
-        while (n < len) {
-            int count = file.read(b, off + n, len - n);
-            if (count < 0) {
-                throw new EOFException("Can not read data. Expected to " + len + " bytes, read " + n
-                        + " bytes before inputstream close.");
-            }
+		int n = 0;
+		while(n < _len) 
+		{
+			int count = _file.read(_b, _off + n, _len - n);
+			if(count < 0) 
+			{
+				throw new EOFException("Can not read data. Expected to " + _len + " bytes, read " + n + " bytes before inputstream close.");
+			}
 
-            n += count;
-        }
-        return n;
-    }
+			n += count;
+		}
+		
+		return n;
+	}
 }

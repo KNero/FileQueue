@@ -17,97 +17,109 @@ import org.slf4j.LoggerFactory;
  * @author Leo Liang
  * 
  */
-public class MetaHolderImpl implements MetaHolder {
-    private static final Logger   log              = LoggerFactory.getLogger(MetaHolderImpl.class);
-    private static final String   METAFILE_DIRNAME = "meta";
-    private static final String   METAFILE_NAME    = "meta";
-    private static final int      METAFILE_SIZE    = 200;
-    private static final byte[]   BUF_MASK         = new byte[METAFILE_SIZE];
+public class MetaHolderImpl implements MetaHolder 
+{
+	private static final Logger log = LoggerFactory.getLogger(MetaHolderImpl.class);
+	private static final String METAFILE_DIRNAME = "meta";
+	private static final String METAFILE_NAME = "meta";
+	private static final int METAFILE_SIZE = 200;
+	private static final byte[] BUF_MASK = new byte[METAFILE_SIZE];
 
-    private AtomicReference<Meta> meta;
-    private File                  baseDir;
-    private MappedByteBuffer      mbb;
+	private AtomicReference<Meta> meta;
+	private File baseDir;
+	private MappedByteBuffer mbb;
 
-    public MetaHolderImpl(String name, String baseDir) {
-        this.baseDir = new File(new File(baseDir, name), METAFILE_DIRNAME);
-    }
+	public MetaHolderImpl(String _name, String _baseDir) 
+	{
+		this.baseDir = new File(new File(_baseDir, _name), METAFILE_DIRNAME);
+	}
 
-    public void update(long readingFileNo, long readingFileOffset) {
-        meta.set(new Meta(readingFileNo, readingFileOffset));
-        saveToFile(readingFileNo, readingFileOffset);
-    }
+	public void update(long _readingFileNo, long _readingFileOffset) 
+	{
+		this.meta.set(new Meta(_readingFileNo, _readingFileOffset));
+		
+		this._saveToFile(_readingFileNo, _readingFileOffset);
+	}
 
-    public void init() throws IOException {
-        createFileIfNeed();
-        loadFromFile();
-    }
+	public void init() throws IOException 
+	{
+		this._createFileIfNeed();
+		this._loadFromFile();
+	}
 
-    private void createFileIfNeed() throws IOException {
-        if (!baseDir.exists()) {
-            baseDir.mkdirs();
-        }
+	private void _createFileIfNeed() throws IOException 
+	{
+		if(! this.baseDir.exists()) 
+		{
+			this.baseDir.mkdirs();
+		}
 
-        File f = getMetaFile();
-        if (!f.exists()) {
-            f.createNewFile();
-        }
-    }
+		File f = this._getMetaFile();
+		if(! f.exists()) 
+		{
+			f.createNewFile();
+		}
+	}
 
-    private File getMetaFile() {
-        return new File(baseDir, METAFILE_NAME);
-    }
+	private File _getMetaFile() 
+	{
+		return new File(baseDir, METAFILE_NAME);
+	}
 
-    private synchronized void saveToFile(long readingFileNo, long readingFileOffset) {
-        mbb.position(0);
-        mbb.put(BUF_MASK);
-        mbb.position(0);
-        mbb.put(String.valueOf(readingFileNo).getBytes());
-        mbb.put("\n".getBytes());
-        mbb.put(String.valueOf(readingFileOffset).getBytes());
-        mbb.put("\n".getBytes());
-    }
+	private synchronized void _saveToFile(long readingFileNo, long readingFileOffset) 
+	{
+		this.mbb.position(0);
+		this.mbb.put(BUF_MASK);
+		this.mbb.position(0);
+		this.mbb.put(String.valueOf(readingFileNo).getBytes());
+		this.mbb.put("\n".getBytes());
+		this.mbb.put(String.valueOf(readingFileOffset).getBytes());
+		this.mbb.put("\n".getBytes());
+	}
 
-    private void loadFromFile() throws IOException {
-        File f = getMetaFile();
+	private void _loadFromFile() throws IOException 
+	{
+		File f = this._getMetaFile();
 
-        FileReader fr = null;
-        BufferedReader br = null;
+		FileReader fr = null;
+		BufferedReader br = null;
 
-        try {
-            fr = new FileReader(f);
-            br = new BufferedReader(fr);
-            String readingFileNoStr = br.readLine();
-            String readingFileOffsetStr = br.readLine();
-            this.meta = new AtomicReference<Meta>(new Meta(
-                    StringUtils.isNumeric(readingFileNoStr) ? Long.valueOf(readingFileNoStr) : -1L,
-                    StringUtils.isNumeric(readingFileOffsetStr) ? Long.valueOf(readingFileOffsetStr) : 0L));
-            this.mbb = new RandomAccessFile(f, "rwd").getChannel().map(MapMode.READ_WRITE, 0, METAFILE_SIZE);
+		try 
+		{
+			fr = new FileReader(f);
+			br = new BufferedReader(fr);
+			String readingFileNoStr = br.readLine();
+			String readingFileOffsetStr = br.readLine();
+			
+			this.meta = new AtomicReference<Meta>(new Meta(StringUtils.isNumeric(readingFileNoStr) ? Long.valueOf(readingFileNoStr) : -1L, 
+					StringUtils.isNumeric(readingFileOffsetStr) ? Long.valueOf(readingFileOffsetStr) : 0L));
+			this.mbb = new RandomAccessFile(f, "rwd").getChannel().map(MapMode.READ_WRITE, 0, METAFILE_SIZE);
 
-        } finally {
-            if (fr != null) {
-                try {
-                    fr.close();
-                } catch (IOException e) {
-                    log.warn("Close meta file fail.");
-                }
-            }
-            if (br != null) {
-                try {
-                    br.close();
-                } catch (IOException e) {
-                    log.warn("Close meta file fail.");
-                }
-            }
-        }
+		} finally {
+			if (fr != null) {
+				try {
+					fr.close();
+				} catch (IOException e) {
+					log.warn("Close meta file fail.");
+				}
+			}
+			if (br != null) {
+				try {
+					br.close();
+				} catch (IOException e) {
+					log.warn("Close meta file fail.");
+				}
+			}
+		}
 
-    }
+	}
 
-    public long getReadingFileNo() {
-        return meta.get().getReadingFileNo();
-    }
+	public long getReadingFileNo() {
+		return meta.get().getReadingFileNo();
+	}
 
-    public long getReadingFileOffset() {
-        return meta.get().getReadingFileOffset();
-    }
+	public long getReadingFileOffset() {
+		return meta.get().getReadingFileOffset();
+	}
 
 }

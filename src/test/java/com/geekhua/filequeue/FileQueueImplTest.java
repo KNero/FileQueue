@@ -25,7 +25,7 @@ import com.geekhua.filequeue.exception.FileQueueClosedException;
  * 
  */
 public class FileQueueImplTest {
-    private static final File baseDir = new File(System.getProperty("java.io.tmpdir", "."), "fileQueueImplTest");
+    private static final File baseDir = new File(".", "fileque");
 
     // private static final File baseDir = new
     // File("/Volumes/HDD/data/appdatas");
