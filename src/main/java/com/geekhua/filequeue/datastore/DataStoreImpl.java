@@ -352,30 +352,41 @@ public class DataStoreImpl<E> implements DataStore<E>
 
 	}
 
-	public long readingFileOffset() {
-		return readingOffset.longValue();
+	public long readingFileOffset() 
+	{
+		return this.readingOffset.longValue();
 	}
 
-	public long readingFileNo() {
-		return readingFileNo.longValue();
+	public long readingFileNo() 
+	{
+		return this.readingFileNo.longValue();
 	}
 
-	public void close() {
-		if (readingFile != null) {
-			try {
-				readingFile.close();
-			} catch (IOException e) {
-				log.warn("Close reading file({}) fail.",
-						getDataFileName(readingFileNo.longValue()));
+	public void close() 
+	{
+		if(readingFile != null) 
+		{
+			try
+			{
+				this.readingFile.close();
+			} 
+			catch(IOException e) 
+			{
+				long fileNo = this.readingFileNo.longValue();
+				log.warn("Close reading file({}) fail.", this.getDataFileName(fileNo));
 			}
 		}
 
-		if (writingFile != null) {
-			try {
-				writingFile.close();
-			} catch (IOException e) {
-				log.warn("Close reading file({}) fail.",
-						getDataFileName(writingFileNo.longValue()));
+		if (writingFile != null) 
+		{
+			try
+			{
+				this.writingFile.close();
+			} 
+			catch(IOException e) 
+			{
+				long fileNo = this.writingFileNo.longValue();
+				log.warn("Close reading file({}) fail.", this.getDataFileName(fileNo));
 			}
 		}
 	}
@@ -385,7 +396,8 @@ public class DataStoreImpl<E> implements DataStore<E>
 	 * 
 	 * @see com.geekhua.filequeue.datastore.DataStore#writingFileNo()
 	 */
-	public long writingFileNo() {
+	public long writingFileNo() 
+	{
 		return writingFileNo.get();
 	}
 

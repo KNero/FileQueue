@@ -67,7 +67,8 @@ public class FileQueueImpl<E> implements FileQueue<E>
 				
 				if(res != null) 
 				{
-					metaHolder.update(dataStore.readingFileNo(), dataStore.readingFileOffset());
+					this.metaHolder.update(dataStore.readingFileNo(), dataStore.readingFileOffset());
+					
 					return res;
 				}
 				// Since res == null not only caused by queue empty,
@@ -85,34 +86,48 @@ public class FileQueueImpl<E> implements FileQueue<E>
 		}
 	}
 
-	public E get(long timeout, TimeUnit unit) throws InterruptedException,
-			IOException {
+	public E get(long _timeout, TimeUnit _unit) throws InterruptedException, IOException 
+	{
 		long startNanos = System.nanoTime();
-		long timeoutNanos = unit.toNanos(timeout);
-		readLock.lockInterruptibly();
-		try {
+		long timeoutNanos = _unit.toNanos(_timeout);
+		
+		this.readLock.lockInterruptibly();
+		
+		try 
+		{
 			E res = null;
-			while (res == null) {
-				res = dataStore.take();
-				if (res != null) {
-					metaHolder.update(dataStore.readingFileNo(),
-							dataStore.readingFileOffset());
+			while(res == null) 
+			{
+				res = this.dataStore.take();
+				
+				if(res != null) 
+				{
+					this.metaHolder.update(dataStore.readingFileNo(), dataStore.readingFileOffset());
+					
 					return res;
-				} else {
+				} 
+				else 
+				{
 					// Since res == null not only caused by queue empty,
 					// but also last msg not flush to disk completely. We
 					// couldn't wait until not empty like
 					// LinkedBlockingQueue.poll
-					if (System.nanoTime() - startNanos < timeoutNanos) {
+					if(System.nanoTime() - startNanos < timeoutNanos) 
+					{
 						TimeUnit.NANOSECONDS.sleep(100);
-					} else {
+					}
+					else
+					{
 						return null;
 					}
 				}
 			}
+			
 			return null;
-		} finally {
-			readLock.unlock();
+		} 
+		finally 
+		{
+			this.readLock.unlock();
 		}
 	}
 
@@ -134,30 +149,39 @@ public class FileQueueImpl<E> implements FileQueue<E>
 		}
 	}
 
-	public void close() {
-		writeLock.lock();
-		try {
-			stopped = true;
-			dataStore.close();
-		} finally {
-			writeLock.unlock();
+	public void close() throws IOException
+	{
+		this.writeLock.lock();
+		
+		try 
+		{
+			this.stopped = true;
+			this.dataStore.close();
+			this.metaHolder.close();
+		}
+		finally 
+		{
+			this.writeLock.unlock();
 		}
 	}
 
-	public long getReadingFileNo() {
+	public long getReadingFileNo() 
+	{
 		return metaHolder.getReadingFileNo();
 	}
 
-	public long getReadingFileOffset() {
+	public long getReadingFileOffset() 
+	{
 		return metaHolder.getReadingFileOffset();
 	}
 
-	public long getWritingFileNo() {
+	public long getWritingFileNo() 
+	{
 		return dataStore.writingFileNo();
 	}
 
-	public long getWritingFileOffset() {
+	public long getWritingFileOffset() 
+	{
 		return dataStore.writingFileOffset();
 	}
-
 }

@@ -1,17 +1,21 @@
 package com.geekhua.filequeue.meta;
 
+import java.io.Closeable;
 import java.io.IOException;
 
 /**
  * @author Leo Liang
  * 
  */
-public interface MetaHolder {
-    void update(long readingFileNo, long readingFileOffset);
+public interface MetaHolder extends Closeable
+{
+	void update(long _readingFileNo, long _readingFileOffset);
 
-    void init() throws IOException;
+	void init() throws IOException;
 
-    long getReadingFileNo();
+	long getReadingFileNo();
 
-    long getReadingFileOffset();
+	long getReadingFileOffset();
+	
+	void close() throws IOException;
 }
