@@ -16,6 +16,6 @@ public interface FileQueue<E> {
 
     public void add(E m) throws IOException, FileQueueClosedException;
 
-    public void close();
+    public void close() throws IOException;
 
 }

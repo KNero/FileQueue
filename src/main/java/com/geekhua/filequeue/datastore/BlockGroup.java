@@ -17,7 +17,8 @@ import com.geekhua.filequeue.utils.StreamUtils;
 public class BlockGroup 
 {
 	private static final byte[] HEADER = new byte[] { (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAB };
-	private static final int CHECKSUMLEN = 20;
+	private static final int CHECKSUM_LEN = 20;
+	private static final int CONTENT_SIZE_LEN = 4;
 
 	private ByteBuffer data;
 	private int blockSize;
@@ -48,7 +49,7 @@ public class BlockGroup
 
 	public static int estimateBlockSize(int _contentSize) 
 	{
-		return _contentSize + HEADER.length + 4 + CHECKSUMLEN;
+		return HEADER.length + CONTENT_SIZE_LEN + _contentSize + CHECKSUM_LEN;
 	}
 
 	/**
@@ -59,7 +60,7 @@ public class BlockGroup
 	 */
 	public static BlockGroup allocate(int _contentSize, int _blockSize) 
 	{
-		int blockCount = _getBlockCount(_contentSize + CHECKSUMLEN, _blockSize);
+		int blockCount = _getBlockCount(_contentSize + CHECKSUM_LEN, _blockSize);
 		ByteBuffer data = ByteBuffer.allocate(blockCount * _blockSize);
 
 		BlockGroup blockGroup = new BlockGroup(data, _blockSize, blockCount);
@@ -68,7 +69,7 @@ public class BlockGroup
 			data.put(HEADER);
 		}
 
-		data.putInt(_contentSize + CHECKSUMLEN);
+		data.putInt(_contentSize + CHECKSUM_LEN);
 
 		return blockGroup;
 	}
@@ -82,7 +83,7 @@ public class BlockGroup
 	 */
 	private static int _getBlockCount(int _contentLength, int _blockSize) 
 	{
-		int dataLen = _contentLength + HEADER.length + 4;
+		int dataLen = HEADER.length + CONTENT_SIZE_LEN + _contentLength;
 		return dataLen / _blockSize + (dataLen % _blockSize == 0 ? 0 : 1);
 	}
 
@@ -126,10 +127,10 @@ public class BlockGroup
 			byte[] data = baos.toByteArray();
 			if(_validateChecksum(data, contentAndChecksumLen)) 
 			{
-				BlockGroup blockGroup = BlockGroup.allocate(contentAndChecksumLen - CHECKSUMLEN, _blockSize);
+				BlockGroup blockGroup = BlockGroup.allocate(contentAndChecksumLen - CHECKSUM_LEN, _blockSize);
 				
-				byte[] content = new byte[contentAndChecksumLen - CHECKSUMLEN];
-				System.arraycopy(data, HEADER.length + 4, content, 0, content.length);
+				byte[] content = new byte[contentAndChecksumLen - CHECKSUM_LEN];
+				System.arraycopy(data, HEADER.length + CONTENT_SIZE_LEN, content, 0, content.length);
 				
 				blockGroup.setContent(content);
 				return blockGroup;
@@ -161,16 +162,16 @@ public class BlockGroup
 
 	private static boolean _validateChecksum(byte[] _block, int _contentAndChecksumLen) 
 	{
-		if(_block != null && _block.length >= _contentAndChecksumLen + HEADER.length + 4) 
+		if(_block != null && _block.length >= _contentAndChecksumLen + HEADER.length + CONTENT_SIZE_LEN) 
 		{
-			byte[] content = new byte[_contentAndChecksumLen - CHECKSUMLEN];
-			byte[] checksum = new byte[CHECKSUMLEN];
+			byte[] content = new byte[_contentAndChecksumLen - CHECKSUM_LEN];
+			byte[] checksum = new byte[CHECKSUM_LEN];
 
-			System.arraycopy(_block, HEADER.length + 4, content, 0, content.length);
-			System.arraycopy(_block, HEADER.length + 4 + content.length, checksum, 0, checksum.length);
+			System.arraycopy(_block, HEADER.length + CONTENT_SIZE_LEN, content, 0, content.length);
+			System.arraycopy(_block, HEADER.length + CONTENT_SIZE_LEN + content.length, checksum, 0, checksum.length);
 			
 			byte[] contentChecksum = EncryptUtils.sha1(content);
-			if(contentChecksum.length == CHECKSUMLEN) 
+			if(contentChecksum.length == CHECKSUM_LEN) 
 			{
 				if(ArrayUtils.isEquals(contentChecksum, checksum)) 
 				{
@@ -193,7 +194,7 @@ public class BlockGroup
 
 	public byte[] array() 
 	{
-		if(this.data.remaining() >= CHECKSUMLEN) 
+		if(this.data.remaining() >= CHECKSUM_LEN) 
 		{
 			this.data.put(EncryptUtils.sha1(this.content));
 			return this.data.array();

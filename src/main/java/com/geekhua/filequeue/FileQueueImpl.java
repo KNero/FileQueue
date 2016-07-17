@@ -85,12 +85,14 @@ public class FileQueueImpl<E> implements FileQueue<E>
 		}
 	}
 
-	public E get(long timeout, TimeUnit unit) throws InterruptedException,
-			IOException {
+	public E get(long timeout, TimeUnit unit) throws InterruptedException, IOException 
+	{
 		long startNanos = System.nanoTime();
 		long timeoutNanos = unit.toNanos(timeout);
-		readLock.lockInterruptibly();
-		try {
+		this.readLock.lockInterruptibly();
+		
+		try 
+		{
 			E res = null;
 			while (res == null) {
 				res = dataStore.take();
@@ -134,30 +136,39 @@ public class FileQueueImpl<E> implements FileQueue<E>
 		}
 	}
 
-	public void close() {
-		writeLock.lock();
-		try {
-			stopped = true;
-			dataStore.close();
-		} finally {
-			writeLock.unlock();
+	public void close() throws IOException
+	{
+		this.writeLock.lock();
+		
+		try 
+		{
+			this.stopped = true;
+			this.dataStore.close();
+			this.metaHolder.close();
+		}
+		finally 
+		{
+			this.writeLock.unlock();
 		}
 	}
 
-	public long getReadingFileNo() {
+	public long getReadingFileNo() 
+	{
 		return metaHolder.getReadingFileNo();
 	}
 
-	public long getReadingFileOffset() {
+	public long getReadingFileOffset() 
+	{
 		return metaHolder.getReadingFileOffset();
 	}
 
-	public long getWritingFileNo() {
+	public long getWritingFileNo() 
+	{
 		return dataStore.writingFileNo();
 	}
 
-	public long getWritingFileOffset() {
+	public long getWritingFileOffset() 
+	{
 		return dataStore.writingFileOffset();
 	}
-
 }

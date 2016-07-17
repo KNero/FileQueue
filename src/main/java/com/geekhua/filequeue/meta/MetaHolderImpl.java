@@ -27,6 +27,8 @@ public class MetaHolderImpl implements MetaHolder
 
 	private AtomicReference<Meta> meta;
 	private File baseDir;
+	
+	private RandomAccessFile randomFile;
 	private MappedByteBuffer mbb;
 
 	public MetaHolderImpl(String _name, String _baseDir) 
@@ -91,22 +93,36 @@ public class MetaHolderImpl implements MetaHolder
 			String readingFileNoStr = br.readLine();
 			String readingFileOffsetStr = br.readLine();
 			
-			this.meta = new AtomicReference<Meta>(new Meta(StringUtils.isNumeric(readingFileNoStr) ? Long.valueOf(readingFileNoStr) : -1L, 
-					StringUtils.isNumeric(readingFileOffsetStr) ? Long.valueOf(readingFileOffsetStr) : 0L));
-			this.mbb = new RandomAccessFile(f, "rwd").getChannel().map(MapMode.READ_WRITE, 0, METAFILE_SIZE);
-
-		} finally {
-			if (fr != null) {
-				try {
+			long readingFileNo = StringUtils.isNumeric(readingFileNoStr) ? Long.valueOf(readingFileNoStr) : -1L;
+			long readingFileOffset = StringUtils.isNumeric(readingFileOffsetStr) ? Long.valueOf(readingFileOffsetStr) : 0L;
+			Meta metaInfo = new Meta(readingFileNo, readingFileOffset);
+			this.meta = new AtomicReference<Meta>(metaInfo);
+			
+			this.randomFile = new RandomAccessFile(f, "rwd");
+			this.mbb = this.randomFile.getChannel().map(MapMode.READ_WRITE, 0, METAFILE_SIZE);
+		}
+		finally 
+		{
+			if(fr != null) 
+			{
+				try
+				{
 					fr.close();
-				} catch (IOException e) {
+				}
+				catch(IOException e) 
+				{
 					log.warn("Close meta file fail.");
 				}
 			}
-			if (br != null) {
-				try {
+			
+			if(br != null) 
+			{
+				try 
+				{
 					br.close();
-				} catch (IOException e) {
+				} 
+				catch(IOException e) 
+				{
 					log.warn("Close meta file fail.");
 				}
 			}
@@ -114,12 +130,18 @@ public class MetaHolderImpl implements MetaHolder
 
 	}
 
-	public long getReadingFileNo() {
+	public long getReadingFileNo() 
+	{
 		return meta.get().getReadingFileNo();
 	}
 
-	public long getReadingFileOffset() {
+	public long getReadingFileOffset() 
+	{
 		return meta.get().getReadingFileOffset();
 	}
 
+	public void close() throws IOException
+	{
+		this.randomFile.close();
+	}
 }
