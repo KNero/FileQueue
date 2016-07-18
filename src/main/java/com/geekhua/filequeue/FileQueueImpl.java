@@ -90,7 +90,6 @@ public class FileQueueImpl<E> implements FileQueue<E>
 	{
 		long startNanos = System.nanoTime();
 		long timeoutNanos = _unit.toNanos(_timeout);
-		
 		this.readLock.lockInterruptibly();
 		
 		try 
