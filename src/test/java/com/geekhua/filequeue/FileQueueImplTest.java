@@ -25,7 +25,7 @@ import com.geekhua.filequeue.exception.FileQueueClosedException;
  * 
  */
 public class FileQueueImplTest {
-    private static final File baseDir = new File(".", "fileque");
+    private static final File baseDir = new File("./fileque");
 
     // private static final File baseDir = new
     // File("/Volumes/HDD/data/appdatas");
@@ -50,7 +50,7 @@ public class FileQueueImplTest {
         Config config = new Config();
         config.setBaseDir(baseDir.getAbsolutePath());
         config.setMsgAvgLen(10);
-        config.setName("test");
+        config.setName("testAdd");
         FileQueue<String> fq = new FileQueueImpl<String>(config);
         fq.add("ssss");
         Assert.assertEquals("ssss", fq.get());
@@ -62,7 +62,7 @@ public class FileQueueImplTest {
         Config config = new Config();
         config.setBaseDir(baseDir.getAbsolutePath());
         config.setMsgAvgLen(10);
-        config.setName("test");
+        config.setName("testAddObj");
         FileQueue<MyObject> fq = new FileQueueImpl<MyObject>(config);
         for (int i = 0; i < 10000; i++) {
             fq.add(new MyObject());
@@ -74,7 +74,7 @@ public class FileQueueImplTest {
     	Config config = new Config();
     	config.setBaseDir(baseDir.getAbsolutePath());
     	config.setMsgAvgLen(10);
-    	config.setName("test");
+    	config.setName("testAddObjMultThread");
     	final FileQueue<MyObject> fq = new FileQueueImpl<MyObject>(config);
     	ExecutorService executorService = Executors.newFixedThreadPool(20);
     	final int threads = 20;
@@ -104,7 +104,7 @@ public class FileQueueImplTest {
         Config config = new Config();
         config.setBaseDir(baseDir.getAbsolutePath());
         config.setMsgAvgLen(10);
-        config.setName("test");
+        config.setName("testAddMultiFiles");
         config.setFileSiz(1024);
         FileQueue<Integer> fq = new FileQueueImpl<Integer>(config);
         int times = 1000;
@@ -123,7 +123,7 @@ public class FileQueueImplTest {
         Config config = new Config();
         config.setBaseDir(baseDir.getAbsolutePath());
         config.setMsgAvgLen(10);
-        config.setName("test");
+        config.setName("testGetTimeout");
         config.setFileSiz(1024);
         FileQueue<Integer> fq = new FileQueueImpl<Integer>(config);
 
@@ -140,7 +140,7 @@ public class FileQueueImplTest {
         Config config = new Config();
         config.setBaseDir(baseDir.getAbsolutePath());
         config.setMsgAvgLen(10);
-        config.setName("test");
+        config.setName("testQueueRestart");
         // single data file
         config.setFileSiz(1024 * 1024 * 1000);
         FileQueue<Integer> fq = new FileQueueImpl<Integer>(config);
@@ -166,7 +166,7 @@ public class FileQueueImplTest {
         Config config = new Config();
         config.setBaseDir(baseDir.getAbsolutePath());
         config.setMsgAvgLen(10);
-        config.setName("test");
+        config.setName("testQueueRestart2");
         // multi data files
         config.setFileSiz(10);
         FileQueue<Integer> fq = new FileQueueImpl<Integer>(config);
@@ -194,6 +194,7 @@ public class FileQueueImplTest {
         config.setMsgAvgLen(1024);
         config.setBaseDir(baseDir.getAbsolutePath());
         config.setFileSiz(1024 * 1024 * 500);
+        config.setName("testWriteSpeed");
         FileQueue<byte[]> fq = new FileQueueImpl<byte[]>(config);
         byte[] content = new byte[1024];
         for (int i = 0; i < 1024; i++) {
@@ -215,6 +216,8 @@ public class FileQueueImplTest {
         config.setMsgAvgLen(1024);
         config.setBaseDir(baseDir.getAbsolutePath());
         config.setFileSiz(1024 * 1024 * 500);
+        config.setName("testReadSpeed");
+        
         FileQueue<byte[]> fq = new FileQueueImpl<byte[]>(config);
         byte[] content = new byte[1024];
         for (int i = 0; i < 1024; i++) {
@@ -241,6 +244,8 @@ public class FileQueueImplTest {
         config.setMsgAvgLen(1024);
         config.setBaseDir(baseDir.getAbsolutePath());
         config.setFileSiz(1024 * 1024 * 500);
+        config.setName("testReadWriteSpeed");
+        
         FileQueue<byte[]> fq = new FileQueueImpl<byte[]>(config);
         byte[] content = new byte[1024];
         for (int i = 0; i < 1024; i++) {
@@ -267,6 +272,7 @@ public class FileQueueImplTest {
 
         Config config = new Config();
         config.setBaseDir(baseDir.getAbsolutePath());
+        config.setName("concurrentTestReadFasterThanWrite");
 
         final FileQueue<TestObject> fq = new FileQueueImpl<TestObject>(config);
         final Set<TestObject> results = Collections.synchronizedSet(new TreeSet<TestObject>());
@@ -344,6 +350,7 @@ public class FileQueueImplTest {
 
         Config config = new Config();
         config.setBaseDir(baseDir.getAbsolutePath());
+        config.setName("concurrentTestWriterFasterThanReader");
 
         final FileQueue<TestObject> fq = new FileQueueImpl<TestObject>(config);
         final Set<TestObject> results = Collections.synchronizedSet(new TreeSet<TestObject>());
@@ -421,6 +428,7 @@ public class FileQueueImplTest {
 
         Config config = new Config();
         config.setBaseDir(baseDir.getAbsolutePath());
+        config.setName("concurrentTestWriterReaderWithSameSpeed");
 
         final FileQueue<TestObject> fq = new FileQueueImpl<TestObject>(config);
         final Set<TestObject> results = Collections.synchronizedSet(new TreeSet<TestObject>());
@@ -496,6 +504,7 @@ public class FileQueueImplTest {
 
         Config config = new Config();
         config.setBaseDir(baseDir.getAbsolutePath());
+        config.setName("stressTest");
 
         final FileQueue<TestObject> fq = new FileQueueImpl<TestObject>(config);
 
