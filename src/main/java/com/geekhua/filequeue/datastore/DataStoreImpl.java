@@ -31,7 +31,7 @@ public class DataStoreImpl<E> implements DataStore<E>
 	private static final Logger log = LoggerFactory.getLogger(DataStoreImpl.class);
 
 	private static final byte[] DATAFILE_END_CONTENT = 
-			new byte[] {(byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAB };
+			new byte[] {(byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAB};
 
 	private byte[] DATAFILE_END;
 	private File baseDir;
@@ -40,6 +40,7 @@ public class DataStoreImpl<E> implements DataStore<E>
 	private Codec codec;
 	private long fileSize;
 	private String name;
+	
 	private RandomAccessFile readingFile = null;
 	private AtomicLong readingFileNo = new AtomicLong(-1L);
 	private AtomicLong readingOffset = new AtomicLong(0L);
@@ -61,7 +62,8 @@ public class DataStoreImpl<E> implements DataStore<E>
 		this.bakDir = new File(new File(config.getBaseDir(), name), DATAFILE_BAKDIR);
 	}
 
-	public void init() throws IOException {
+	public void init() throws IOException 
+	{
 		BlockGroup endFileBlockGroup = BlockGroup.allocate(DATAFILE_END_CONTENT.length, blockSize);
 		endFileBlockGroup.setContent(DATAFILE_END_CONTENT);
 
@@ -73,8 +75,8 @@ public class DataStoreImpl<E> implements DataStore<E>
 		this._recoverLastDataFileIfNeeded();
 		this._createNewWriteFile();
 		
-		checkReadingFile();
-		_openReadingFile();
+		this._checkReadingFile();
+		this._openReadingFile();
 	}
 
 	private boolean _createBaseDirIfNeeded() 
@@ -103,7 +105,8 @@ public class DataStoreImpl<E> implements DataStore<E>
 		{
 			try 
 			{
-				this.writingFile.write(DATAFILE_END);
+				//파일이 끝났다는 것을 표시한다.
+				this.writingFile.write(this.DATAFILE_END);
 				this.writingFile.close();
 			}
 			catch(IOException e) 
@@ -114,7 +117,7 @@ public class DataStoreImpl<E> implements DataStore<E>
 			this.writingFile = null;
 		}
 
-		String newWriteFileName = this.getNewWriteFileName();
+		String newWriteFileName = this._getNewWriteFileName();
 		if(StringUtils.isNotBlank(newWriteFileName)) 
 		{
 			try 
@@ -132,32 +135,35 @@ public class DataStoreImpl<E> implements DataStore<E>
 		}
 	}
 
-	private long _getFileNumber(String _fileName) {
-		String fileNumber = _fileName.substring(DATAFILE_PREFIX.length(),
-				_fileName.length() - DATAFILE_SUFIX.length());
+	private long _getFileNumber(String _fileName) 
+	{
+		String fileNumber = _fileName.substring(DATAFILE_PREFIX.length(), _fileName.length() - DATAFILE_SUFIX.length());
+		
 		return StringUtils.isBlank(_fileName) ? 0L : Long.valueOf(fileNumber);
 	}
 
-	public String getNewWriteFileName() {
-		return getDataFileName(writingFileNo.incrementAndGet());
+	private String _getNewWriteFileName() 
+	{
+		return _getDataFileName(writingFileNo.incrementAndGet());
 	}
 
-	public String getDataFileName(long fileNo) 
+	private String _getDataFileName(long fileNo) 
 	{
 		return DATAFILE_PREFIX + String.format("%018d", fileNo)	+ DATAFILE_SUFIX;
 	}
 
-	private void checkReadingFile() {
-		if (readingFileNo.longValue() < 0) {
+	private void _checkReadingFile()
+	{
+		if(readingFileNo.longValue() < 0) 
+		{
 			readingFileNo = new AtomicLong(0);
 			readingOffset.set(0L);
 		}
 
-		File file = new File(baseDir,
-				getDataFileName(readingFileNo.longValue()));
-		while (!file.exists()) {
-			file = new File(baseDir,
-					getDataFileName(readingFileNo.incrementAndGet()));
+		File file = new File(baseDir, _getDataFileName(readingFileNo.longValue()));
+		while (!file.exists()) 
+		{
+			file = new File(baseDir, _getDataFileName(readingFileNo.incrementAndGet()));
 			readingOffset.set(0L);
 		}
 
@@ -168,10 +174,8 @@ public class DataStoreImpl<E> implements DataStore<E>
 			RandomAccessFile lastWriteFile = null;
 
 			try {
-				String fileName = this.getDataFileName(writingFileNo
-						.longValue());
-				lastWriteFile = new RandomAccessFile(
-						new File(baseDir, fileName), "rw");
+				String fileName = this._getDataFileName(writingFileNo.longValue());
+				lastWriteFile = new RandomAccessFile(new File(baseDir, fileName), "rw");
 
 				if (lastWriteFile.length() % this.blockSize != 0) {
 					long newLength = (lastWriteFile.length() / this.blockSize + 1)
@@ -194,10 +198,11 @@ public class DataStoreImpl<E> implements DataStore<E>
 
 	private void _getLastDataFileNo() 
 	{
-		String[] dataFilesArr = baseDir.list(new FilenameFilter() {
+		String[] dataFilesArr = baseDir.list(new FilenameFilter() 
+		{
 			public boolean accept(File dir, String name) 
 			{
-				if (StringUtils.endsWith(name, DATAFILE_SUFIX) && StringUtils.startsWith(name, DATAFILE_PREFIX)) 
+				if(StringUtils.endsWith(name, DATAFILE_SUFIX) && StringUtils.startsWith(name, DATAFILE_PREFIX)) 
 				{
 					return true;
 				}
@@ -232,7 +237,7 @@ public class DataStoreImpl<E> implements DataStore<E>
 		{
 			try 
 			{
-				String fileName = this.getDataFileName(this.readingFileNo.longValue());
+				String fileName = this._getDataFileName(this.readingFileNo.longValue());
 				this.readingFile = new RandomAccessFile(new File(baseDir, fileName), "r");
 
 				long readPosition = readingOffset.longValue();
@@ -256,7 +261,7 @@ public class DataStoreImpl<E> implements DataStore<E>
 					}
 				}
 				
-				String fileName = this.getDataFileName(this.readingFileNo.longValue());
+				String fileName = this._getDataFileName(this.readingFileNo.longValue());
 				throw new IllegalStateException(String.format("File(%s) open fail",	fileName), e);
 			}
 		}
@@ -266,7 +271,7 @@ public class DataStoreImpl<E> implements DataStore<E>
 	{
 		byte[] content = codec.encode(element);
 
-		if (content != null && content.length != 0) 
+		if(content != null && content.length != 0) 
 		{
 			// 설정한 파일사이즈보다 새로운 파일을 생성
 			if(this.writingFile.length() >= this.fileSize) 
@@ -279,7 +284,9 @@ public class DataStoreImpl<E> implements DataStore<E>
 
 			if(this.writingFile.length() % this.blockSize != 0) 
 			{
-				this.writingFile.seek((this.writingFile.length() / blockSize + 1) * blockSize);
+				//만약 현재 파일크기가 설정된 block size와 나눠 떨어지지 않을 경우
+				//나눠 떨어질 수 있는 다음 위치부터 파일을 기록한다.
+				this.writingFile.seek((this.writingFile.length() / this.blockSize + 1) * this.blockSize);
 			}
 			
 			this.writingFile.write(blockGroup.array());
@@ -300,11 +307,11 @@ public class DataStoreImpl<E> implements DataStore<E>
 
 			blockGroup = BlockGroup.read(this.readingFile, this.blockSize);
 			
-			if((blockGroup != null && ArrayUtils.isEquals(blockGroup.array(), DATAFILE_END)) || blockGroup == null) 
+			if((blockGroup != null && ArrayUtils.isEquals(blockGroup.array(), this.DATAFILE_END)) || blockGroup == null) 
 			{
 				if(this.readingFileNo.longValue() < writingFileNo.longValue()) 
 				{
-					if(readingFile != null) 
+					if(this.readingFile != null) 
 					{
 						this.readingFile.close();
 						this.readingFile = null;
@@ -313,18 +320,18 @@ public class DataStoreImpl<E> implements DataStore<E>
 						{
 							try 
 							{
-								String fileName = this.getDataFileName(this.readingFileNo.longValue());
+								String fileName = this._getDataFileName(this.readingFileNo.longValue());
 								FileUtils.moveFileToDirectory(new File(baseDir, fileName), bakDir, true);
 							} 
 							catch(IOException e) 
 							{
-								String fileName = this.getDataFileName(this.readingFileNo.longValue());
+								String fileName = this._getDataFileName(this.readingFileNo.longValue());
 								log.warn("Move file({}) to dir({}) fail.", new File(baseDir, fileName), bakDir);
 							}
 						} 
 						else 
 						{
-							String fileName = this.getDataFileName(this.readingFileNo.longValue());
+							String fileName = this._getDataFileName(this.readingFileNo.longValue());
 							FileUtils.deleteQuietly(new File(baseDir, fileName));
 						}
 					}
@@ -373,7 +380,7 @@ public class DataStoreImpl<E> implements DataStore<E>
 			catch(IOException e) 
 			{
 				long fileNo = this.readingFileNo.longValue();
-				log.warn("Close reading file({}) fail.", this.getDataFileName(fileNo));
+				log.warn("Close reading file({}) fail.", this._getDataFileName(fileNo));
 			}
 		}
 
@@ -386,7 +393,7 @@ public class DataStoreImpl<E> implements DataStore<E>
 			catch(IOException e) 
 			{
 				long fileNo = this.writingFileNo.longValue();
-				log.warn("Close reading file({}) fail.", this.getDataFileName(fileNo));
+				log.warn("Close reading file({}) fail.", this._getDataFileName(fileNo));
 			}
 		}
 	}

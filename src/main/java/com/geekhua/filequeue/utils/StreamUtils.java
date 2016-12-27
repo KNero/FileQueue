@@ -8,7 +8,8 @@ import java.io.RandomAccessFile;
  * @author Leo Liang
  * 
  */
-public class StreamUtils {
+public class StreamUtils 
+{
 	public static int readFully(RandomAccessFile _file, byte[] _b, int _off, int _len) throws IOException 
 	{
 		if(_len < 0) 

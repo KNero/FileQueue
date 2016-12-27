@@ -59,10 +59,16 @@ public class Config {
     /**
      * 저장될 메시지의 평균 길이를 입력한다.
      * 평균길이를 활용하여 BlockGroup에서 사용될 버퍼의 크기를 정한다.
-     * @param msgAvgLen
+     * @param _msgAvgLen
      */
-    public void setMsgAvgLen(int msgAvgLen) {
-        this.msgAvgLen = msgAvgLen;
+    public void setMsgAvgLen(int _msgAvgLen) 
+    {
+    	if(_msgAvgLen <= 0)
+    	{
+    		throw new IllegalArgumentException("_msgAvgLen is bigger than zero.(_msgAvgLen > 0)");
+    	}
+    	
+        this.msgAvgLen = _msgAvgLen;
     }
 
     public void setReadingFileNo(long readingFileNo) {
