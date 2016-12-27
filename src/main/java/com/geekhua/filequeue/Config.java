@@ -107,4 +107,18 @@ public class Config {
         return fileSiz;
     }
 
+	public Config clone() 
+	{
+		Config conf = new Config();
+		conf.setBakReadFile(this.bakReadFile);
+		conf.setBaseDir(this.baseDir);
+		conf.setCodec(this.codec);
+		conf.setFileSiz(this.fileSiz);
+		conf.setMsgAvgLen(this.msgAvgLen);
+		conf.setName(this.name);
+		conf.setReadingFileNo(this.readingFileNo);
+		conf.setReadingOffset(this.readingOffset);
+
+		return conf;
+	}
 }

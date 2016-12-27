@@ -5,10 +5,6 @@ import java.util.concurrent.TimeUnit;
 
 import com.geekhua.filequeue.exception.FileQueueClosedException;
 
-/**
- * @author Leo Liang
- * 
- */
 public interface FileQueue<E> {
     public E get() throws InterruptedException, IOException;
 
