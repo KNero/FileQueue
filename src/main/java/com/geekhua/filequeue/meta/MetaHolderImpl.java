@@ -24,6 +24,7 @@ public class MetaHolderImpl implements MetaHolder
 	private static final String METAFILE_NAME = "meta";
 	private static final int METAFILE_SIZE = 200;
 	private static final byte[] BUF_MASK = new byte[METAFILE_SIZE];
+	private static final byte[] NEW_LINE = "\n".getBytes();
 
 	private AtomicReference<Meta> meta;
 	private File baseDir;
@@ -74,9 +75,9 @@ public class MetaHolderImpl implements MetaHolder
 		this.mbb.put(BUF_MASK);
 		this.mbb.position(0);
 		this.mbb.put(String.valueOf(readingFileNo).getBytes());
-		this.mbb.put("\n".getBytes());
+		this.mbb.put(NEW_LINE);
 		this.mbb.put(String.valueOf(readingFileOffset).getBytes());
-		this.mbb.put("\n".getBytes());
+		this.mbb.put(NEW_LINE);
 	}
 
 	private void _loadFromFile() throws IOException 
