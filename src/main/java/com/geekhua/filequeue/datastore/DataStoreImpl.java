@@ -307,9 +307,12 @@ public class DataStoreImpl<E> implements DataStore<E>
 
 			blockGroup = BlockGroup.read(this.readingFile, this.blockSize);
 			
+<<<<<<< HEAD
 			/**
 			 *읽은 데이터(blockGroup)이 파일의 마지막이라면 readingFile을 삭제하거나 백업한다.
 			 */
+=======
+>>>>>>> branch 'master' of https://github.com/KNero/FileQueue.git
 			if((blockGroup != null && ArrayUtils.isEquals(blockGroup.array(), this.DATAFILE_END)) || blockGroup == null) 
 			{
 				if(this.readingFileNo.longValue() < writingFileNo.longValue()) 

@@ -86,30 +86,6 @@ public class CodecTest {
 		decodeMultThread(codec);
 	}
 
-	@Test
-	public void testKryoSerializeEncode() {
-		encode(new KryoCodec());
-	}
-
-	@Test
-	public void testKryoSerializeDecode() {
-		Codec codec = new KryoCodec();
-		encode(codec);
-		decode(codec);
-	}
-
-	@Test
-	public void testKryoSerializeEncodeMultThreads() throws InterruptedException {
-		encodeMultThread(new KryoCodec());
-	}
-
-	@Test
-	public void testKryoSerializeDecodeMultThreads() throws InterruptedException {
-		final Codec codec = new KryoCodec();
-		encode(codec);
-		decodeMultThread(codec);
-	}
-
 	public void clean() {
 		objectBytes = null;
 	}

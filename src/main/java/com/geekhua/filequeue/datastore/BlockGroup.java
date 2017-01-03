@@ -16,7 +16,7 @@ import com.geekhua.filequeue.utils.StreamUtils;
  */
 public class BlockGroup 
 {
-	private static final byte[] HEADER = new byte[] { (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAB };
+	private static final byte[] HEADER = new byte[] {(byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAB};
 	private static final int CHECKSUM_LEN = 20;
 	private static final int CONTENT_SIZE_LEN = 4;
 
@@ -32,6 +32,11 @@ public class BlockGroup
 		this.blockCount = _blockCount;
 	}
 
+	public void setContent(byte[] _content) 
+	{
+		this.content = _content;
+	}
+	
 	public byte[] getContent() 
 	{
 		return content;
@@ -54,6 +59,7 @@ public class BlockGroup
 
 	/**
 	 * content에 필요한 block 개수를 구한뒤 block 전체크기의 Buffer를 할당한 BlockGroup를 반환한다.
+	 * 데이터 하나의 구조 : HEADER(4) + Length(4 = data length + checksum length) + Data + Checksum
 	 * @param _contentSize 저장할 content 크기
 	 * @param _blockSize
 	 * @return content를 저장할 BlockGroup
@@ -97,6 +103,7 @@ public class BlockGroup
 			return null;
 		}
 
+		//HEADER가 포함된 첫 번째 들럭을 읽는다.
 		StreamUtils.readFully(_file, block, 0, _blockSize);
 
 		if(_validateHeader(block)) 
@@ -108,7 +115,7 @@ public class BlockGroup
 			baos.write(block);
 
 			int contentAndChecksumLen = blockBuffer.getInt();
-			//위에서 하나의 block을 읽었기 때문에 -1 해준다.
+			//HEADER 검사를 위해서 먼저 읽은 하나의 블록은 빼준다.
 			int unreadBlockCount = _getBlockCount(contentAndChecksumLen, _blockSize) - 1;
 
 			for(int i = 0; i < unreadBlockCount; i++) 
@@ -137,11 +144,17 @@ public class BlockGroup
 			}
 		}
 		
+		//checksum이 맞지 않는 다음 checksum이 맞을 때 까지 계속해서 다음 블록을 읽는다.
 		_file.seek(markedPos + _blockSize);
 		
 		return read(_file, _blockSize);
 	}
 
+	/**
+	 * HEADER가 포함된 첫 번째 블록에 맨 앞에서 부터 HEADER가 포함되어 있는지 검사한다.
+	 * @param _block
+	 * @return
+	 */
 	private static boolean _validateHeader(byte[] _block) 
 	{
 		if(_block != null && _block.length >= HEADER.length) 
@@ -183,20 +196,17 @@ public class BlockGroup
 		return false;
 	}
 
-	public void setContent(byte[] _content) 
-	{
-		if(_content != null && data.remaining() >= _content.length) 
-		{
-			this.data.put(_content);
-			this.content = _content;
-		}
-	}
-
 	public byte[] array() 
 	{
+		if(this.content != null && data.remaining() >= this.content.length) 
+		{
+			this.data.put(this.content);
+		}
+		
 		if(this.data.remaining() >= CHECKSUM_LEN) 
 		{
 			this.data.put(EncryptUtils.sha1(this.content));
+			
 			return this.data.array();
 		}
 
