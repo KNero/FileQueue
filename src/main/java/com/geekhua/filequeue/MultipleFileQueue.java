@@ -3,7 +3,6 @@ package com.geekhua.filequeue;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -13,7 +12,11 @@ import com.geekhua.filequeue.exception.FileQueueClosedException;
 public class MultipleFileQueue<E> implements Closeable
 {
 	private List<FileQueue<E>> queueList;
+	
+	private Object readLock;
 	private AtomicLong readCount;
+	
+	private Object writeLock;
 	private AtomicLong writeCount;
 	
 	public MultipleFileQueue(int _size)
@@ -28,9 +31,13 @@ public class MultipleFileQueue<E> implements Closeable
 			_config = new Config();
 		}
 		
-		this.queueList = Collections.synchronizedList(new ArrayList<FileQueue<E>>(_size));
-		this.readCount = new AtomicLong();
-		this.writeCount = new AtomicLong();
+		this.readLock = new Object();
+		this.readCount = new AtomicLong(0);
+		
+		this.writeLock = new Object();
+		this.writeCount = new AtomicLong(0);
+		
+		this.queueList = new ArrayList<>(_size);
 		
 		for(int i = 0; i < _size; ++i)
 		{
@@ -51,7 +58,11 @@ public class MultipleFileQueue<E> implements Closeable
 	
 	public void add(int _queIndex, E _e) throws IOException, FileQueueClosedException
 	{
-		FileQueue<E> queue = this.queueList.get(_queIndex);
+		FileQueue<E> queue = null;
+		synchronized(this.writeLock)
+		{
+			queue = this.queueList.get(_queIndex);
+		}
 		
 		queue.add(_e);
 	}
@@ -65,7 +76,11 @@ public class MultipleFileQueue<E> implements Closeable
 	
 	public E get(int _queIndex) throws InterruptedException, IOException
 	{
-		FileQueue<E> queue = this.queueList.get(_queIndex);
+		FileQueue<E> queue = null;
+		synchronized(this.readLock)
+		{
+			queue = this.queueList.get(_queIndex);
+		}
 		
 		return queue.get();
 	}
@@ -79,7 +94,11 @@ public class MultipleFileQueue<E> implements Closeable
 	
 	public E get(int _queIndex, long _timeout, TimeUnit _timeUnit) throws InterruptedException, IOException
 	{
-		FileQueue<E> queue = this.queueList.get(_queIndex);
+		FileQueue<E> queue = null;
+		synchronized(this.writeLock)
+		{
+			queue = this.queueList.get(_queIndex);
+		}
 		
 		return queue.get(_timeout, _timeUnit);
 	}
