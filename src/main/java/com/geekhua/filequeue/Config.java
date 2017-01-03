@@ -16,7 +16,7 @@ public class Config {
     private long    readingFileNo = -1L;
     private long    readingOffset = 0L;
     private long    fileSiz       = 1024 * 1024 * 100;
-    private boolean bakReadFile   = false;
+    private boolean bakReadFile   = false; //readingFile을 모두 읽고 백업을 원한다면 true;
 
     public boolean isBakReadFile() {
         return bakReadFile;
@@ -59,10 +59,16 @@ public class Config {
     /**
      * 저장될 메시지의 평균 길이를 입력한다.
      * 평균길이를 활용하여 BlockGroup에서 사용될 버퍼의 크기를 정한다.
-     * @param msgAvgLen
+     * @param _msgAvgLen
      */
-    public void setMsgAvgLen(int msgAvgLen) {
-        this.msgAvgLen = msgAvgLen;
+    public void setMsgAvgLen(int _msgAvgLen) 
+    {
+    	if(_msgAvgLen <= 0)
+    	{
+    		throw new IllegalArgumentException("_msgAvgLen is bigger than zero.(_msgAvgLen > 0)");
+    	}
+    	
+        this.msgAvgLen = _msgAvgLen;
     }
 
     public void setReadingFileNo(long readingFileNo) {
@@ -101,4 +107,18 @@ public class Config {
         return fileSiz;
     }
 
+	public Config clone() 
+	{
+		Config conf = new Config();
+		conf.setBakReadFile(this.bakReadFile);
+		conf.setBaseDir(this.baseDir);
+		conf.setCodec(this.codec);
+		conf.setFileSiz(this.fileSiz);
+		conf.setMsgAvgLen(this.msgAvgLen);
+		conf.setName(this.name);
+		conf.setReadingFileNo(this.readingFileNo);
+		conf.setReadingOffset(this.readingOffset);
+
+		return conf;
+	}
 }
