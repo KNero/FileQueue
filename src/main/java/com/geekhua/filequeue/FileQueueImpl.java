@@ -53,6 +53,26 @@ public class FileQueueImpl<E> implements FileQueue<E>
 			throw new RuntimeException("FileQueue init fail.", e);
 		}
 	}
+	
+	public E poll() throws InterruptedException, IOException
+	{
+		this.readLock.lockInterruptibly();
+		
+		try
+		{
+			E res = this.dataStore.take();
+			if(res != null) 
+			{
+				this.metaHolder.update(dataStore.readingFileNo(), dataStore.readingFileOffset());
+			}
+			
+			return res;
+		}
+		finally
+		{
+			this.readLock.unlock();
+		}
+	}
 
 	public E get() throws InterruptedException, IOException 
 	{
