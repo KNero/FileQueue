@@ -34,7 +34,7 @@ public class MultipleQueueTest
 			
 			for(int i = 0; i < 10; ++i)
 			{
-				byte[] buf = q.get();
+				byte[] buf = q.poll();
 				System.out.println(new String(buf));
 			}
 			
@@ -99,7 +99,7 @@ public class MultipleQueueTest
 						{
 							try
 							{
-								String data = new String(q.get());
+								String data = new String(q.poll());
 								
 								synchronized(checkSet)
 								{
