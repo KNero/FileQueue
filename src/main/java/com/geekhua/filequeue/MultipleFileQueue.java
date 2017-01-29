@@ -4,6 +4,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.geekhua.filequeue.exception.FileQueueClosedException;
@@ -66,11 +67,27 @@ public class MultipleFileQueue<E> implements Closeable
 		queue.add(_e);
 	}
 	
-	public E get() throws InterruptedException, IOException
+	public E poll() throws InterruptedException, IOException
 	{
-		int queIndex = (int)(this.readCount.getAndIncrement() % this.queueList.size());
+		int queSize = this.queueList.size();
+		for(int i = 0; i < queSize; ++i)
+		{
+			int queIndex = (int)(this.readCount.getAndIncrement() % queSize);
+			
+			FileQueue<E> queue = null;
+			synchronized(this.readLock)
+			{
+				queue = this.queueList.get(queIndex);
+			}
+			
+			E e = queue.poll();
+			if(e != null)
+			{
+				return e;
+			}
+		}
 		
-		return this.get(queIndex);
+		return null;
 	}
 	
 	public E get(int _queIndex) throws InterruptedException, IOException
@@ -81,7 +98,18 @@ public class MultipleFileQueue<E> implements Closeable
 			queue = this.queueList.get(_queIndex);
 		}
 		
-		return queue.poll();
+		return queue.get();
+	}
+	
+	public E get(int _queIndex, long _timeout, TimeUnit _timeunit) throws InterruptedException, IOException
+	{
+		FileQueue<E> queue = null;
+		synchronized(this.readLock)
+		{
+			queue = this.queueList.get(_queIndex);
+		}
+		
+		return queue.get(_timeout, _timeunit);
 	}
 	
 	@Override
