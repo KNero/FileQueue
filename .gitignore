@@ -11,3 +11,6 @@ target/
 .project
 .classpath
 .settings/
+/bin/
+/fileque/
+/.gitignore
