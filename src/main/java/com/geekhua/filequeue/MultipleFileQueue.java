@@ -1,49 +1,39 @@
 package com.geekhua.filequeue;
 
+import com.geekhua.filequeue.exception.FileQueueClosedException;
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-
-import com.geekhua.filequeue.exception.FileQueueClosedException;
 
 public class MultipleFileQueue<E> implements Closeable
 {
 	private List<FileQueue<E>> queueList;
-	
-	private Object readLock;
-	private AtomicLong readCount;
-	
-	private Object writeLock;
-	private AtomicLong writeCount;
+
+	private AtomicInteger readCount;
+	private AtomicInteger writeCount;
 	
 	public MultipleFileQueue(int _size)
 	{
 		this(_size, null);
 	}
 	
-	public MultipleFileQueue(int _size, Config _config)
-	{
-		if(_config == null)
-		{
+	public MultipleFileQueue(int _size, Config _config) {
+		if (_config == null) {
 			_config = new Config();
 		}
-		
-		this.readLock = new Object();
-		this.readCount = new AtomicLong(0);
-		
-		this.writeLock = new Object();
-		this.writeCount = new AtomicLong(0);
-		
+
+		this.readCount = new AtomicInteger();
+		this.writeCount = new AtomicInteger();
 		this.queueList = new ArrayList<>(_size);
-		
-		for(int i = 0; i < _size; ++i)
-		{
+
+		for (int i = 0; i < _size; ++i) {
 			Config conf = _config.clone();
 			conf.setName(_config.getName() + "_" + i);
-			
+
 			FileQueue<E> que = new FileQueueImpl<E>(conf);
 			this.queueList.add(que);
 		}
@@ -51,65 +41,31 @@ public class MultipleFileQueue<E> implements Closeable
 	
 	public void add(E _e) throws IOException, FileQueueClosedException
 	{
-		int queIndex = (int)(this.writeCount.getAndIncrement() % this.queueList.size());
-		
-		this.add(queIndex, _e);
-	}
-	
-	public void add(int _queIndex, E _e) throws IOException, FileQueueClosedException
-	{
-		FileQueue<E> queue = null;
-		synchronized(this.writeLock)
-		{
-			queue = this.queueList.get(_queIndex);
-		}
-		
+		int queIndex = Math.abs(this.writeCount.getAndIncrement() % this.queueList.size());
+
+		FileQueue<E> queue = this._getQueue(queIndex);
 		queue.add(_e);
 	}
-	
-	public E poll() throws InterruptedException, IOException
-	{
+
+	public E poll() throws InterruptedException, IOException {
 		int queSize = this.queueList.size();
-		for(int i = 0; i < queSize; ++i)
-		{
-			int queIndex = (int)(this.readCount.getAndIncrement() % queSize);
-			
-			FileQueue<E> queue = null;
-			synchronized(this.readLock)
-			{
-				queue = this.queueList.get(queIndex);
-			}
-			
+		for (int i = 0; i < queSize; ++i) {
+			int queIndex = Math.abs(this.readCount.getAndIncrement() % queSize);
+
+			FileQueue<E> queue = this._getQueue(queIndex);
 			E e = queue.poll();
-			if(e != null)
-			{
+			if (e != null) {
 				return e;
 			}
 		}
-		
+
 		return null;
 	}
-	
-	public E get(int _queIndex) throws InterruptedException, IOException
-	{
-		FileQueue<E> queue = null;
-		synchronized(this.readLock)
-		{
-			queue = this.queueList.get(_queIndex);
+
+	private FileQueue<E> _getQueue(int _index) {
+		synchronized (this.queueList) {
+			return this.queueList.get(_index);
 		}
-		
-		return queue.get();
-	}
-	
-	public E get(int _queIndex, long _timeout, TimeUnit _timeunit) throws InterruptedException, IOException
-	{
-		FileQueue<E> queue = null;
-		synchronized(this.readLock)
-		{
-			queue = this.queueList.get(_queIndex);
-		}
-		
-		return queue.get(_timeout, _timeunit);
 	}
 	
 	@Override
