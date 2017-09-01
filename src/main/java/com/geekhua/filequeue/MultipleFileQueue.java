@@ -11,7 +11,8 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class MultipleFileQueue<E> implements Closeable
 {
-	private List<FileQueue<E>> queueList;
+	private final List<FileQueue<E>> queueList;
+	private int size;
 
 	private AtomicInteger readCount;
 	private AtomicInteger writeCount;
@@ -29,18 +30,18 @@ public class MultipleFileQueue<E> implements Closeable
 		this.readCount = new AtomicInteger();
 		this.writeCount = new AtomicInteger();
 		this.queueList = new ArrayList<>(_size);
+		this.size = _size;
 
 		for (int i = 0; i < _size; ++i) {
 			Config conf = _config.clone();
 			conf.setName(_config.getName() + "_" + i);
 
-			FileQueue<E> que = new FileQueueImpl<E>(conf);
+			FileQueue<E> que = new FileQueueImpl<>(conf);
 			this.queueList.add(que);
 		}
 	}
 	
-	public void add(E _e) throws IOException, FileQueueClosedException
-	{
+	public void add(E _e) throws IOException, FileQueueClosedException {
 		int queIndex = Math.abs(this.writeCount.getAndIncrement() % this.queueList.size());
 
 		FileQueue<E> queue = this._getQueue(queIndex);
@@ -48,9 +49,8 @@ public class MultipleFileQueue<E> implements Closeable
 	}
 
 	public E poll() throws InterruptedException, IOException {
-		int queSize = this.queueList.size();
-		for (int i = 0; i < queSize; ++i) {
-			int queIndex = Math.abs(this.readCount.getAndIncrement() % queSize);
+		for (int i = 0; i < this.size; ++i) {
+			int queIndex = Math.abs(this.readCount.getAndIncrement() % this.size);
 
 			FileQueue<E> queue = this._getQueue(queIndex);
 			E e = queue.poll();
@@ -63,9 +63,7 @@ public class MultipleFileQueue<E> implements Closeable
 	}
 
 	private FileQueue<E> _getQueue(int _index) {
-		synchronized (this.queueList) {
-			return this.queueList.get(_index);
-		}
+		return this.queueList.get(_index);
 	}
 	
 	@Override

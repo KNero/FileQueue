@@ -9,12 +9,12 @@ public interface FileQueue<E>
 {
 	E poll() throws InterruptedException, IOException;
 	
-    public E get() throws InterruptedException, IOException;
+    E get() throws InterruptedException, IOException;
 
-    public E get(long timeout, TimeUnit timeUnit) throws InterruptedException, IOException;
+    E get(long timeout, TimeUnit timeUnit) throws InterruptedException, IOException;
 
-    public void add(E m) throws IOException, FileQueueClosedException;
+    void add(E m) throws IOException, FileQueueClosedException;
 
-    public void close() throws IOException;
+    void close() throws IOException;
 
 }

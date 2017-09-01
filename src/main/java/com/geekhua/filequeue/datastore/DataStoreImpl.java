@@ -38,7 +38,7 @@ public class DataStoreImpl<E> implements DataStore<E>
 	private File bakDir;
 	private int blockSize;
 	private Codec codec;
-	private long fileSize;
+	private long maxFileSize;
 	private String name;
 	
 	private RandomAccessFile readingFile = null;
@@ -57,16 +57,14 @@ public class DataStoreImpl<E> implements DataStore<E>
 		this.readingFileNo = new AtomicLong(config.getReadingFileNo());
 		this.readingOffset = new AtomicLong(config.getReadingOffset());
 		this.codec = config.getCodec();
-		this.fileSize = config.getFileSize();
+		this.maxFileSize = config.getFileSize();
 		this.bakReadFile = config.isBakReadFile();
 		this.bakDir = new File(new File(config.getBaseDir(), name), DATAFILE_BAKDIR);
 	}
 
 	public void init() throws IOException 
 	{
-		BlockGroup endFileBlockGroup = BlockGroup.allocate(DATAFILE_END_CONTENT.length, blockSize);
-		endFileBlockGroup.setContent(DATAFILE_END_CONTENT);
-
+		BlockGroup endFileBlockGroup = BlockGroup.allocate(DATAFILE_END_CONTENT, blockSize);
 		this.DATAFILE_END = endFileBlockGroup.array();
 
 		this._createBaseDirIfNeeded();
@@ -99,56 +97,34 @@ public class DataStoreImpl<E> implements DataStore<E>
 		return true;
 	}
 
-	private void _createNewWriteFile() throws IOException 
-	{
-		if(this.writingFile != null) 
-		{
-			try 
-			{
-				//파일이 끝났다는 것을 표시한다.
-				this.writingFile.write(this.DATAFILE_END);
-				this.writingFile.close();
-			}
-			catch(IOException e) 
-			{
-				throw e;
-			}
-
+	private void _createNewWriteFile() throws IOException {
+		if(this.writingFile != null) {
+			//파일이 끝났다는 것을 표시한다.
+			this.writingFile.write(this.DATAFILE_END);
+			this.writingFile.close();
 			this.writingFile = null;
 		}
 
 		String newWriteFileName = this._getNewWriteFileName();
-		if(StringUtils.isNotBlank(newWriteFileName)) 
-		{
-			try 
-			{
-				this.writingFile = new RandomAccessFile(new File(baseDir, newWriteFileName), "rw");
-			}
-			catch(FileNotFoundException e) 
-			{
-				throw new IllegalStateException(String.format("File(%s) not found", newWriteFileName), e);
-			}
-		} 
-		else 
-		{
-			throw new IllegalStateException("Can not create new write file");
+
+		try {
+			this.writingFile = new RandomAccessFile(new File(this.baseDir, newWriteFileName), "rw");
+		} catch(FileNotFoundException e) {
+			throw new IllegalStateException(String.format("File(%s) not found", newWriteFileName), e);
 		}
 	}
 
 	private long _getFileNumber(String _fileName) 
 	{
 		String fileNumber = _fileName.substring(DATAFILE_PREFIX.length(), _fileName.length() - DATAFILE_SUFIX.length());
-		
 		return StringUtils.isBlank(_fileName) ? 0L : Long.valueOf(fileNumber);
 	}
 
-	private String _getNewWriteFileName() 
-	{
-		return _getDataFileName(writingFileNo.incrementAndGet());
+	private String _getNewWriteFileName() {
+		return _getDataFileName(this.writingFileNo.incrementAndGet());
 	}
 
-	private String _getDataFileName(long fileNo) 
-	{
+	private String _getDataFileName(long fileNo) {
 		return DATAFILE_PREFIX + String.format("%018d", fileNo)	+ DATAFILE_SUFIX;
 	}
 
@@ -267,20 +243,14 @@ public class DataStoreImpl<E> implements DataStore<E>
 		}
 	}
 
-	public void put(E element) throws IOException 
-	{
+	public void put(E element) throws IOException {
 		byte[] content = codec.encode(element);
 
-		if(content != null && content.length != 0) 
-		{
+		if(content != null && content.length != 0) {
 			// 설정한 파일사이즈보다 새로운 파일을 생성
-			if(this.writingFile.length() >= this.fileSize) 
-			{
+			if(this.writingFile.length() >= this.maxFileSize) {
 				this._createNewWriteFile();
 			}
-
-			BlockGroup blockGroup = BlockGroup.allocate(content.length, this.blockSize);
-			blockGroup.setContent(content);
 
 			if(this.writingFile.length() % this.blockSize != 0) 
 			{
@@ -288,7 +258,8 @@ public class DataStoreImpl<E> implements DataStore<E>
 				//나눠 떨어질 수 있는 다음 위치부터 파일을 기록한다.
 				this.writingFile.seek((this.writingFile.length() / this.blockSize + 1) * this.blockSize);
 			}
-			
+
+			BlockGroup blockGroup = BlockGroup.allocate(content, this.blockSize);
 			this.writingFile.write(blockGroup.array());
 		}
 	}

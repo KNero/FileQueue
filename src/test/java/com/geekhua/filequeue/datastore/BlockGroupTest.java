@@ -11,17 +11,19 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.geekhua.filequeue.utils.EncryptUtils;
+import org.powermock.reflect.Whitebox;
 
 /**
  * 
- * @author Leo Liang
+ * @author kwonsm
  * 
  */
 public class BlockGroupTest {
-    private static final File baseDir = new File("./fileque/BlockGroupTest");
-//    private static final File baseDir = new File("blockGroupTest");
+    private static final File baseDir = new File("./target/fileque/blockGroupTest");
     private static final byte[] HEADER      = new byte[] { (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAB };
-    private static final int    CHECKSUMLEN = 20;
+    private static final int CHECKSUM_LEN = 20;
+	private static final int HEADER_LEN = 4;
+	private static final int CONTENT_CHECKSUM_LEN = 4;
 
     @Before
     public void before() throws Exception {
@@ -39,137 +41,150 @@ public class BlockGroupTest {
     }
 
     @Test
-    public void testAllocate() {
-        byte[] content = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 };
-        BlockGroup blockGroup = BlockGroup.allocate(content.length, 1024);
-        blockGroup.setContent(content);
-        Assert.assertEquals(1024, blockGroup.getBlockSize());
-        Assert.assertEquals(1, blockGroup.getBlockCount());
-        Assert.assertArrayEquals(contentBytes(content, 1024), blockGroup.array());
+    public void test_allocate() throws Exception {
+    	int blockSize = 3;
+        byte[] content = new byte[] {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+        BlockGroup blockGroup = BlockGroup.allocate(content, blockSize);
+
+		byte[] buf = blockGroup.array();
+
+		boolean checkHeader = Whitebox.invokeMethod(BlockGroup.class, "_validateHeader", buf);
+		Assert.assertTrue(checkHeader);
+
+		ByteBuffer temp = ByteBuffer.wrap(buf);
+		temp.getInt();
+		int contentAndChecksumLen = temp.getInt();
+		boolean checksum = Whitebox.invokeMethod(BlockGroup.class, "_validateChecksum", buf, contentAndChecksumLen);
+		Assert.assertTrue(checksum);
+
+		byte[] copyContent = new byte[content.length];
+		temp.get(copyContent);
+		Assert.assertArrayEquals(content, copyContent);
     }
 
     @Test
-    public void testAllocateMultiBlocks() {
-        byte[] content = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
-        BlockGroup blockGroup = BlockGroup.allocate(content.length, 10);
-        blockGroup.setContent(content);
-        Assert.assertEquals(10, blockGroup.getBlockSize());
-        Assert.assertEquals(4, blockGroup.getBlockCount());
-        Assert.assertArrayEquals(contentBytes(content, 10), blockGroup.array());
+    public void test_readBlockGroup() throws Exception {
+        byte[] content = new byte[] {1, 2, 3, 4, 5, 6, 7, 8};
+		RandomAccessFile file = null;
+
+        try {
+			BlockGroup blockGroup = BlockGroup.allocate(content, 3);
+
+			file = getFile();
+			file.write(blockGroup.array());
+			file.seek(0);
+
+			BlockGroup readBlockGroup = BlockGroup.read(file, blockGroup.getBlockSize());
+			Assert.assertArrayEquals(content, readBlockGroup.getContent());
+		} finally {
+        	if (file != null) {
+				file.close();
+			}
+		}
     }
 
     @Test
-    public void testReadBlockGroupNormal() throws Exception {
-        byte[] content = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 };
-        BlockGroup blockGroup = BlockGroup.allocate(content.length, 1024);
-        blockGroup.setContent(content);
+    public void test_readNextBlockAfterHeaderFail() throws Exception {
+    	int blockSize = 1024;
+		RandomAccessFile file = null;
 
-        RandomAccessFile file = getFile();
-        file.write(blockGroup.array());
-        file.seek(0);
+		try {
+			file = getFile();
 
-        BlockGroup readBlockGroup = BlockGroup.read(file, 1024);
-        Assert.assertArrayEquals(content, readBlockGroup.getContent());
-        file.close();
+			ByteBuffer buf = ByteBuffer.allocate(blockSize);
+			buf.put(new byte[]{'t', 'e', 's', 't'});
+			buf.putInt(blockSize - HEADER_LEN);
+
+			while (buf.remaining() > blockSize) {
+				buf.put((byte) 0);
+			}
+
+			file.write(buf.array());
+
+			byte[] content = new byte[] {1, 2, 3, 4, 5, 6, 7, 8};
+			BlockGroup blockGroup = BlockGroup.allocate(content, blockSize);
+
+			file.write(blockGroup.array());
+			file.seek(0);
+
+			BlockGroup readBlockGroup = BlockGroup.read(file, 1024);
+			Assert.assertArrayEquals(content, readBlockGroup.getContent());
+		} finally {
+			if (file != null) {
+				file.close();
+			}
+		}
     }
 
     @Test
-    public void testReadBlockGroupNormalMultiBlocks() throws Exception {
-        byte[] content = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
-        BlockGroup blockGroup = BlockGroup.allocate(content.length, 10);
-        blockGroup.setContent(content);
+    public void test_readNextBlockAfterChecksumFail() throws Exception {
+		int blockSize = 1024;
+		RandomAccessFile file = null;
 
-        RandomAccessFile file = getFile();
-        file.write(blockGroup.array());
-        file.seek(0);
+		try {
+			file = getFile();
 
-        BlockGroup readBlockGroup = BlockGroup.read(file, 10);
-        Assert.assertArrayEquals(content, readBlockGroup.getContent());
-        file.close();
+			ByteBuffer buf = ByteBuffer.allocate(blockSize);
+			buf.put(HEADER);
+			buf.putInt(blockSize - HEADER_LEN);
+
+			for (int i = 0; i < 3; i++) {
+				buf.put(new byte[]{'t', 'e', 's', 't'});
+			}
+
+			while (buf.remaining() > 0) {
+				buf.put((byte) 0);
+			}
+
+			file.write(buf.array());
+
+			byte[] content = new byte[] {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+			BlockGroup blockGroup = BlockGroup.allocate(content, blockSize);
+
+			file.write(blockGroup.array());
+			file.seek(0);
+
+			BlockGroup readBlockGroup = BlockGroup.read(file, blockSize);
+			Assert.assertArrayEquals(content, readBlockGroup.getContent());
+		} finally {
+			if (file != null) {
+				file.close();
+			}
+		}
     }
 
     @Test
-    public void testReadBlockGroupFailByFirstBlock() throws Exception {
-        ByteBuffer blocks = ByteBuffer.allocate(2048);
-        blocks.put(new byte[] { 34, 5, 5, 66 });
-        while (blocks.remaining() > 1024) {
-            blocks.put((byte) 0);
-        }
-        byte[] content = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 };
-        blocks.put(contentBytes(content, 1024));
+    public void test_readBlockGroupFailByCheckSumMultiBlocks() throws Exception {
+		RandomAccessFile file = null;
+		int blockSize = 100;
 
-        RandomAccessFile file = getFile();
-        file.write(blocks.array());
-        file.seek(0);
+		try {
+			file = getFile();
 
-        BlockGroup readBlockGroup = BlockGroup.read(file, 1024);
-        Assert.assertArrayEquals(content, readBlockGroup.getContent());
-        file.close();
-    }
+			ByteBuffer blocks = ByteBuffer.allocate(blockSize * 6);
+			for (int i = 0; i < 3; i++) {
+				blocks.put(new byte[] {34, 5, 5, 66});
+			}
 
-    @Test
-    public void testReadBlockGroupFailByFirstNBlockMultiblock() throws Exception {
-        ByteBuffer blocks = ByteBuffer.allocate(70);
-        for (int i = 0; i < 3; i++) {
-            blocks.put(new byte[] { 34, 5, 5, 66 });
-            while (blocks.remaining() > 70 - (i + 1) * 10) {
-                blocks.put((byte) 0);
-            }
-        }
-        byte[] content = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
-        blocks.put(contentBytes(content, 10));
+			while (blocks.remaining() > 0) {
+				blocks.put((byte) 0);
+			}
 
-        RandomAccessFile file = getFile();
-        file.write(blocks.array());
-        file.seek(0);
+			file.write(blocks.array());
 
-        BlockGroup readBlockGroup = BlockGroup.read(file, 10);
-        Assert.assertArrayEquals(content, readBlockGroup.getContent());
-        file.close();
-    }
+			byte[] content = new byte[] {1, 2, 3, 4, 5, 6, 7, 8};
+			BlockGroup blockGroup = BlockGroup.allocate(content, blockSize);
 
-    @Test
-    public void testReadBlockGroupFailByCheckSum() throws Exception {
-        ByteBuffer blocks = ByteBuffer.allocate(3072);
-        blocks.put(new byte[] { 34, 5, 5, 66 });
-        while (blocks.remaining() > 2048) {
-            blocks.put((byte) 0);
-        }
-        byte[] content = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 };
-        blocks.put(contentBytesWithoutChecksum(content, 1024));
+			file.write(blockGroup.array());
+			file.seek(0);
 
-        blocks.put(contentBytes(content, 1024));
-
-        RandomAccessFile file = getFile();
-        file.write(blocks.array());
-        file.seek(0);
-
-        BlockGroup readBlockGroup = BlockGroup.read(file, 1024);
-        Assert.assertArrayEquals(content, readBlockGroup.getContent());
-        file.close();
-    }
-
-    @Test
-    public void testReadBlockGroupFailByCheckSumMultiBlocks() throws Exception {
-        ByteBuffer blocks = ByteBuffer.allocate(110);
-        for (int i = 0; i < 3; i++) {
-            blocks.put(new byte[] { 34, 5, 5, 66 });
-            while (blocks.remaining() > 110 - (i + 1) * 10) {
-                blocks.put((byte) 0);
-            }
-        }
-        byte[] content = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 };
-        blocks.put(contentBytesWithoutChecksum(content, 10));
-
-        blocks.put(contentBytes(content, 10));
-
-        RandomAccessFile file = getFile();
-        file.write(blocks.array());
-        file.seek(0);
-
-        BlockGroup readBlockGroup = BlockGroup.read(file, 10);
-        Assert.assertArrayEquals(content, readBlockGroup.getContent());
-        file.close();
+			BlockGroup readBlockGroup = BlockGroup.read(file, blockSize);
+			Assert.assertArrayEquals(content, readBlockGroup.getContent());
+		} finally {
+			if (file != null) {
+				file.close();
+			}
+		}
     }
 
     @Test
@@ -271,11 +286,11 @@ public class BlockGroupTest {
     }
 
     private byte[] contentBytes(byte[] content, int blockSize) {
-        int bytesLen = content.length + HEADER.length + 4 + CHECKSUMLEN;
+        int bytesLen = HEADER.length + CONTENT_CHECKSUM_LEN + content.length + CHECKSUM_LEN;
         ByteBuffer expectedBytes = ByteBuffer.allocate(((bytesLen / blockSize) + (bytesLen % blockSize == 0 ? 0 : 1))
                 * blockSize);
         expectedBytes.put(HEADER);
-        expectedBytes.putInt(content.length + CHECKSUMLEN);
+        expectedBytes.putInt(content.length + CHECKSUM_LEN);
         expectedBytes.put(content);
         expectedBytes.put(EncryptUtils.sha1(content));
         while (expectedBytes.hasRemaining()) {
@@ -285,11 +300,11 @@ public class BlockGroupTest {
     }
 
     private byte[] contentBytesWithoutChecksum(byte[] content, int blockSize) {
-        int bytesLen = content.length + HEADER.length + 4 + CHECKSUMLEN;
+        int bytesLen = content.length + HEADER.length + 4 + CHECKSUM_LEN;
         ByteBuffer expectedBytes = ByteBuffer.allocate(((bytesLen / blockSize) + (bytesLen % blockSize == 0 ? 0 : 1))
                 * blockSize);
         expectedBytes.put(HEADER);
-        expectedBytes.putInt(content.length + CHECKSUMLEN);
+        expectedBytes.putInt(content.length + CHECKSUM_LEN);
         expectedBytes.put(content);
         while (expectedBytes.hasRemaining()) {
             expectedBytes.put((byte) 0);

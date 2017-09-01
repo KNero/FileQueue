@@ -5,24 +5,26 @@ import java.io.RandomAccessFile;
 import java.util.Collection;
 
 import org.apache.commons.io.FileUtils;
+import org.junit.After;
 import org.junit.Assert;
 
 import com.geekhua.filequeue.Config;
 import com.geekhua.filequeue.codec.Codec;
 import com.geekhua.filequeue.codec.ObjectCodec;
+import org.junit.Before;
 
 /**
  * @author Leo Liang
  * 
  */
 public class DataStoreImplTest {
-    private static final File   baseDir              = new File("./fileque", "datastoreTest");
+    private static final File   baseDir = new File("./target/fileque", "datastoreTest");
     private static final byte[] DATAFILE_END_CONTENT = new byte[] { (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAA,
             (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAB };
     private static final byte[] HEADER               = new byte[] { (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAB };
     private static final int    CHECKSUMLEN          = 20;
 
-//    @Before
+    @Before
     public void before() throws Exception {
         if (baseDir.exists()) {
             FileUtils.deleteDirectory(baseDir);
@@ -30,7 +32,7 @@ public class DataStoreImplTest {
         baseDir.mkdirs();
     }
 
-//    @After
+    @After
     public void after() throws Exception {
         if (baseDir.exists()) {
             FileUtils.deleteDirectory(baseDir);
@@ -196,10 +198,12 @@ public class DataStoreImplTest {
         config.setFileSiz(100);
         DataStore<byte[]> ds = new DataStoreImpl<byte[]>(config);
         ds.init();
-        BlockGroup block = BlockGroup.allocate(80, BlockGroup.estimateBlockSize(5));
-        block.setContent(new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 1, 2, 3,
-                4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
-                13, 14, 15, 16, 17, 18, 19, 20, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 });
+
+        byte[] dataArray = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 1, 2, 3,
+				4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+				13, 14, 15, 16, 17, 18, 19, 20, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 };
+
+        BlockGroup block = BlockGroup.allocate(dataArray, BlockGroup.estimateBlockSize(5));
         byte[] content = block.array();
         byte[] corruptContent = new byte[content.length - 120];
         System.arraycopy(content, 0, corruptContent, 0, content.length - 120);
@@ -412,8 +416,6 @@ public class DataStoreImplTest {
     }
 
     private BlockGroup getEndBlockGroup() {
-        BlockGroup endBlockGroup = BlockGroup.allocate(DATAFILE_END_CONTENT.length, 10);
-        endBlockGroup.setContent(DATAFILE_END_CONTENT);
-        return endBlockGroup;
+        return BlockGroup.allocate(DATAFILE_END_CONTENT, 10);
     }
 }
