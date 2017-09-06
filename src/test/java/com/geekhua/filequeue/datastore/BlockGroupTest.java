@@ -188,132 +188,52 @@ public class BlockGroupTest {
     }
 
     @Test
-    public void testReadBlockGroupFailByCheckSumMultiBlocks2() throws Exception {
-        ByteBuffer blocks = ByteBuffer.allocate(110);
-        for (int i = 0; i < 2; i++) {
-            blocks.put(new byte[] { 34, 5, 5, 66 });
-            while (blocks.remaining() > 110 - (i + 1) * 10) {
-                blocks.put((byte) 0);
-            }
-        }
+    public void test_readBlockGroupWithFlushDelay() throws Exception {
+		RandomAccessFile file = null;
+		int blockSize = 50;
 
-        blocks.put(HEADER);
-        blocks.putInt(20);
-        blocks.put(new byte[] { 0, 0 });
+		try {
+			file = getFile();
 
-        byte[] content = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 };
-        blocks.put(contentBytesWithoutChecksum(content, 10));
+			ByteBuffer blocks = ByteBuffer.allocate(blockSize * 6);
+			for (int i = 0; i < 3; i++) {
+				blocks.put(new byte[] {34, 5, 5, 66});
+			}
 
-        blocks.put(contentBytes(content, 10));
+			while (blocks.remaining() > 0) {
+				blocks.put((byte) 0);
+			}
 
-        RandomAccessFile file = getFile();
-        file.write(blocks.array());
-        file.seek(0);
+			file.write(blocks.array());
 
-        BlockGroup readBlockGroup = BlockGroup.read(file, 10);
-        Assert.assertArrayEquals(content, readBlockGroup.getContent());
-        file.close();
-    }
+			byte[] content = new byte[] {1, 2, 3, 4, 5, 6, 7, 8};
+			BlockGroup blockGroup = BlockGroup.allocate(content, blockSize);
 
-    @Test
-    public void testReadBlockGroupWithFlushDelay() throws Exception {
-        ByteBuffer blocks = ByteBuffer.allocate(70);
-        for (int i = 0; i < 2; i++) {
-            blocks.put(new byte[] { 34, 5, 5, 66 });
-            while (blocks.remaining() > 70 - (i + 1) * 10) {
-                blocks.put((byte) 0);
-            }
-        }
+			file.write(blockGroup.array());
 
-        blocks.put(HEADER);
-        blocks.putInt(20);
-        blocks.put(new byte[] { 0, 0 });
+			blocks = ByteBuffer.allocate(blockSize * 2);
+			for (int i = 0; i < 3; i++) {
+				blocks.put(new byte[] {34, 5, 5, 66});
+			}
 
-        byte[] content = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 };
-        blocks.put(contentBytesWithoutChecksum(content, 10));
+			while (blocks.remaining() > 0) {
+				blocks.put((byte) 0);
+			}
 
-        byte[] bytes = contentBytes(content, 10);
+			file.write(blocks.array());
+			file.seek(0);
 
-        RandomAccessFile file = getFile();
-        file.write(blocks.array());
-        file.write(bytes, 0, 9);
-        file.seek(0);
-
-        BlockGroup readBlockGroup = BlockGroup.read(file, 10);
-        Assert.assertNull(readBlockGroup);
-        long originPos = file.getFilePointer();
-        file.seek(file.length());
-        file.write(bytes, 9, bytes.length - 9);
-        file.seek(originPos);
-        readBlockGroup = BlockGroup.read(file, 10);
-        Assert.assertArrayEquals(content, readBlockGroup.getContent());
-        file.close();
-    }
-
-    @Test
-    public void testReadBlockGroupWithFlushDelay2() throws Exception {
-        ByteBuffer blocks = ByteBuffer.allocate(70);
-        for (int i = 0; i < 2; i++) {
-            blocks.put(new byte[] { 34, 5, 5, 66 });
-            while (blocks.remaining() > 70 - (i + 1) * 10) {
-                blocks.put((byte) 0);
-            }
-        }
-
-        blocks.put(HEADER);
-        blocks.putInt(20);
-        blocks.put(new byte[] { 0, 0 });
-
-        byte[] content = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 };
-        blocks.put(contentBytesWithoutChecksum(content, 10));
-
-        byte[] bytes = contentBytes(content, 10);
-
-        RandomAccessFile file = getFile();
-        file.write(blocks.array());
-        file.write(bytes, 0, 12);
-        file.seek(0);
-
-        BlockGroup readBlockGroup = BlockGroup.read(file, 10);
-        Assert.assertNull(readBlockGroup);
-        long originPos = file.getFilePointer();
-        file.seek(file.length());
-        file.write(bytes, 12, bytes.length - 12);
-        file.seek(originPos);
-        readBlockGroup = BlockGroup.read(file, 10);
-        Assert.assertArrayEquals(content, readBlockGroup.getContent());
-        file.close();
-    }
-
-    private byte[] contentBytes(byte[] content, int blockSize) {
-        int bytesLen = HEADER.length + CONTENT_CHECKSUM_LEN + content.length + CHECKSUM_LEN;
-        ByteBuffer expectedBytes = ByteBuffer.allocate(((bytesLen / blockSize) + (bytesLen % blockSize == 0 ? 0 : 1))
-                * blockSize);
-        expectedBytes.put(HEADER);
-        expectedBytes.putInt(content.length + CHECKSUM_LEN);
-        expectedBytes.put(content);
-        expectedBytes.put(EncryptUtils.sha1(content));
-        while (expectedBytes.hasRemaining()) {
-            expectedBytes.put((byte) 0);
-        }
-        return expectedBytes.array();
-    }
-
-    private byte[] contentBytesWithoutChecksum(byte[] content, int blockSize) {
-        int bytesLen = content.length + HEADER.length + 4 + CHECKSUM_LEN;
-        ByteBuffer expectedBytes = ByteBuffer.allocate(((bytesLen / blockSize) + (bytesLen % blockSize == 0 ? 0 : 1))
-                * blockSize);
-        expectedBytes.put(HEADER);
-        expectedBytes.putInt(content.length + CHECKSUM_LEN);
-        expectedBytes.put(content);
-        while (expectedBytes.hasRemaining()) {
-            expectedBytes.put((byte) 0);
-        }
-        return expectedBytes.array();
+			BlockGroup readBlockGroup = BlockGroup.read(file, blockSize);
+			Assert.assertArrayEquals(content, readBlockGroup.getContent());
+			Assert.assertNotSame(file.length(), file.getFilePointer());
+		} finally {
+			if (file != null) {
+				file.close();
+			}
+		}
     }
 
     private RandomAccessFile getFile() throws Exception {
         return new RandomAccessFile(new File(baseDir, "test"), "rw");
     }
-
 }
