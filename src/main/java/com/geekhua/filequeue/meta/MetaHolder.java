@@ -9,7 +9,7 @@ import java.io.IOException;
  */
 public interface MetaHolder extends Closeable
 {
-	void update(long _readingFileNo, long _readingFileOffset);
+	void update(long readingFileNo, long readingFileOffset);
 
 	void init() throws IOException;
 
