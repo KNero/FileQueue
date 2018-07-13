@@ -23,10 +23,10 @@ public class BlockGroup
 	private byte[] content;
 	private int blockCount;
 
-	private BlockGroup(ByteBuffer _data, int _blockSize, int _blockCount) {
-		this.data = _data;
-		this.blockSize = _blockSize;
-		this.blockCount = _blockCount;
+	private BlockGroup(ByteBuffer data, int blockSize, int blockCount) {
+		this.data = data;
+		this.blockSize = blockSize;
+		this.blockCount = blockCount;
 	}
 	
 	public byte[] getContent() 

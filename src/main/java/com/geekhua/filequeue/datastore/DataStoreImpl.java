@@ -1,56 +1,43 @@
 package com.geekhua.filequeue.datastore;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FilenameFilter;
-import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.util.concurrent.atomic.AtomicLong;
-
+import com.geekhua.filequeue.Config;
+import com.geekhua.filequeue.codec.Codec;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.geekhua.filequeue.Config;
-import com.geekhua.filequeue.codec.Codec;
+import java.io.*;
+import java.util.concurrent.atomic.AtomicLong;
 
-/**
- * 
- * @author Leo Liang
- * 
- */
-public class DataStoreImpl<E> implements DataStore<E> 
-{
+public class DataStoreImpl<E> implements DataStore<E> {
+    private static final Logger log = LoggerFactory.getLogger(DataStoreImpl.class);
+
 	private static final String DATAFILE_DIRNAME = "data";
-	private static final String DATAFILE_PREFIX = "fdata-";
-	private static final String DATAFILE_SUFIX = ".fq";
-	private static final String DATAFILE_BAKDIR = "bak";
-
-	private static final Logger log = LoggerFactory.getLogger(DataStoreImpl.class);
+	private static final String DATAFILE_PREFIX = "q-";
+	private static final String DATAFILE_EXTENSION = ".fq";
+	private static final String DATAFILE_BACK_DIR = "bak";
 
 	private static final byte[] DATAFILE_END_CONTENT = 
 			new byte[] {(byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAB};
 
-	private byte[] DATAFILE_END;
 	private File baseDir;
-	private File bakDir;
+	private File backDir;
 	private int blockSize;
 	private Codec codec;
 	private long maxFileSize;
 	private String name;
 	
 	private RandomAccessFile readingFile = null;
-	private AtomicLong readingFileNo = new AtomicLong(-1L);
-	private AtomicLong readingOffset = new AtomicLong(0L);
-	private boolean bakReadFile = false;
+	private AtomicLong readingFileNo;
+	private AtomicLong readingOffset;
+	private boolean bakReadFile;
 
 	private AtomicLong writingFileNo = new AtomicLong(-1L);
 	private RandomAccessFile writingFile = null;
 
-	public DataStoreImpl(Config config) 
-	{
+	public DataStoreImpl(Config config) {
 		this.name = config.getName();
 		this.baseDir = new File(new File(config.getBaseDir(), name), DATAFILE_DIRNAME);
 		this.blockSize = BlockGroup.estimateBlockSize(config.getMsgAvgLen());
@@ -59,185 +46,140 @@ public class DataStoreImpl<E> implements DataStore<E>
 		this.codec = config.getCodec();
 		this.maxFileSize = config.getFileSize();
 		this.bakReadFile = config.isBakReadFile();
-		this.bakDir = new File(new File(config.getBaseDir(), name), DATAFILE_BAKDIR);
+		this.backDir = new File(new File(config.getBaseDir(), name), DATAFILE_BACK_DIR);
 	}
 
-	public void init() throws IOException 
-	{
-		BlockGroup endFileBlockGroup = BlockGroup.allocate(DATAFILE_END_CONTENT, blockSize);
-		this.DATAFILE_END = endFileBlockGroup.array();
+    private static String getDataFileName(long fileNo) {
+        return DATAFILE_PREFIX + String.format("%018d", fileNo)	+ DATAFILE_EXTENSION;
+    }
 
-		this._createBaseDirIfNeeded();
-		this._createBakDirIfNeeded();
-		this._getLastDataFileNo();
-		this._recoverLastDataFileIfNeeded();
-		this._createNewWriteFile();
+    /**
+     * @param fileName q-000000000000000001.fq 형식
+     * @return 파일 큐 이름이 q-000000000000000001.fq 이면 1을 반환
+     */
+    private long getFileNumber(String fileName) {
+        String fileNumber = fileName.substring(DATAFILE_PREFIX.length(), fileName.length() - DATAFILE_EXTENSION.length());
+        return StringUtils.isBlank(fileName) ? 0L : Long.valueOf(fileNumber);
+    }
+
+	public void init() throws IOException {
+		createBaseDirIfNeeded();
+		createBakDirIfNeeded();
+		initLastDataFileNo();
+		recoverLastDataFileIfNeeded();
+		createNewWriteFile();
 		
-		this._checkReadingFile();
-		this._openReadingFile();
+		checkReadingFile();
+		openReadingFile();
 	}
 
-	private boolean _createBaseDirIfNeeded() 
-	{
-		if(!this.baseDir.exists()) 
-		{
-			return this.baseDir.mkdirs();
+	private void createBaseDirIfNeeded() {
+		if (!baseDir.exists() || !baseDir.mkdirs()) {
+            log.error("Can not create queue data directory. {}", baseDir.getAbsolutePath());
 		}
-
-		return true;
 	}
 
-	private boolean _createBakDirIfNeeded() 
-	{
-		if(!this.bakDir.exists()) 
-		{
-			return bakDir.mkdirs();
+	private void createBakDirIfNeeded() {
+		if (!backDir.exists() || !backDir.mkdirs()) {
+            log.error("Can not create queue backup directory. {}", backDir.getAbsolutePath());
 		}
-
-		return true;
 	}
 
-	private void _createNewWriteFile() throws IOException {
+    /**
+     * 큐파일 중에서 가장 마지막에 생성된 파일을 찾는다.
+     */
+    private void initLastDataFileNo() {
+        String[] dataFilesArr = baseDir.list(new FilenameFilter() {
+            public boolean accept(File dir, String name) {
+                return StringUtils.endsWith(name, DATAFILE_EXTENSION) && StringUtils.startsWith(name, DATAFILE_PREFIX);
+            }
+        });
+
+        long maxDataFileNo = -1L;
+
+        if (dataFilesArr != null) {
+            for (String dataFile : dataFilesArr) {
+                long fileNo = getFileNumber(dataFile);
+                if(fileNo > maxDataFileNo) {
+                    maxDataFileNo = fileNo;
+                }
+            }
+
+            this.writingFileNo.set(maxDataFileNo);
+        }
+    }
+
+    /**
+     * 전에 사용하던 마지막 큐파일은 더 이상 사용하지 않고 새로운 큐파일을 사용하기 위해 end block 을 쓴다.
+     */
+    private void recoverLastDataFileIfNeeded() throws IOException {
+        if (writingFileNo.longValue() >= 0) {
+            String fileName = getDataFileName(writingFileNo.longValue());
+
+            File lastFile = new File(baseDir, fileName);
+            if (lastFile.length() % blockSize != 0) {
+                throw new IOException("file size % block size != 0. file size:" + lastFile.length() + ", block size:" + blockSize);
+            }
+
+            try (FileOutputStream lastWriteFile = new FileOutputStream(lastFile, true)) {
+                BlockGroup endFileBlock = BlockGroup.allocate(DATAFILE_END_CONTENT, blockSize);
+                lastWriteFile.write(endFileBlock.array());
+            }
+        }
+    }
+
+	private void createNewWriteFile() throws IOException {
+        // init 단계에서는 null 이기 때문에 실행되지 않는다.
 		if(this.writingFile != null) {
 			//파일이 끝났다는 것을 표시한다.
-			this.writingFile.write(this.DATAFILE_END);
+            BlockGroup endFileBlock = BlockGroup.allocate(DATAFILE_END_CONTENT, blockSize);
+			this.writingFile.write(endFileBlock.array());
 			this.writingFile.close();
 			this.writingFile = null;
 		}
 
-		String newWriteFileName = this._getNewWriteFileName();
-
-		try {
-			this.writingFile = new RandomAccessFile(new File(this.baseDir, newWriteFileName), "rw");
-		} catch(FileNotFoundException e) {
-			throw new IllegalStateException(String.format("File(%s) not found", newWriteFileName), e);
-		}
+		String newWriteFileName = getDataFileName(this.writingFileNo.incrementAndGet());
+        this.writingFile = new RandomAccessFile(new File(this.baseDir, newWriteFileName), "rw");
 	}
 
-	private long _getFileNumber(String _fileName) 
-	{
-		String fileNumber = _fileName.substring(DATAFILE_PREFIX.length(), _fileName.length() - DATAFILE_SUFIX.length());
-		return StringUtils.isBlank(_fileName) ? 0L : Long.valueOf(fileNumber);
-	}
-
-	private String _getNewWriteFileName() {
-		return _getDataFileName(this.writingFileNo.incrementAndGet());
-	}
-
-	private String _getDataFileName(long fileNo) {
-		return DATAFILE_PREFIX + String.format("%018d", fileNo)	+ DATAFILE_SUFIX;
-	}
-
-	private void _checkReadingFile()
-	{
-		if(readingFileNo.longValue() < 0) 
-		{
+	private void checkReadingFile() {
+		if(readingFileNo.longValue() < 0) {
 			readingFileNo = new AtomicLong(0);
 			readingOffset.set(0L);
 		}
 
-		File file = new File(baseDir, _getDataFileName(readingFileNo.longValue()));
-		while (!file.exists()) 
-		{
-			file = new File(baseDir, _getDataFileName(readingFileNo.incrementAndGet()));
+		File file = new File(baseDir, getDataFileName(readingFileNo.longValue()));
+		if (!file.exists()) {
 			readingOffset.set(0L);
 		}
-
 	}
 
-	private void _recoverLastDataFileIfNeeded() throws IOException {
-		if (writingFileNo.longValue() >= 0) {
-			RandomAccessFile lastWriteFile = null;
-
-			try {
-				String fileName = this._getDataFileName(writingFileNo.longValue());
-				lastWriteFile = new RandomAccessFile(new File(baseDir, fileName), "rw");
-
-				if (lastWriteFile.length() % this.blockSize != 0) {
-					long newLength = (lastWriteFile.length() / this.blockSize + 1)
-							* blockSize;
-					lastWriteFile.seek(newLength);
-					lastWriteFile.setLength(newLength);
-				} else {
-					lastWriteFile.seek(lastWriteFile.length());
-				}
-
-				lastWriteFile.write(DATAFILE_END);
-			} finally {
-				if (lastWriteFile != null) {
-					lastWriteFile.close();
-				}
-			}
-
-		}
-	}
-
-	private void _getLastDataFileNo() 
-	{
-		String[] dataFilesArr = baseDir.list(new FilenameFilter() 
-		{
-			public boolean accept(File dir, String name) 
-			{
-				if(StringUtils.endsWith(name, DATAFILE_SUFIX) && StringUtils.startsWith(name, DATAFILE_PREFIX)) 
-				{
-					return true;
-				}
-
-				return false;
-			}
-		});
-
-		long maxDataFileNo = -1L;
-
-		for (String dataFile : dataFilesArr) 
-		{
-			long fileNo = _getFileNumber(dataFile);
-			if(fileNo > maxDataFileNo) 
-			{
-				maxDataFileNo = fileNo;
-			}
-		}
-
-		this.writingFileNo.set(maxDataFileNo);
-	}
-
-	private void _openReadingFile() 
-	{
-		if(this.readingFileNo.longValue() < 0 && this.writingFileNo.longValue() >= 0) 
-		{
+	private void openReadingFile() {
+		if(this.readingFileNo.longValue() < 0 && this.writingFileNo.longValue() >= 0) {
 			this.readingFileNo = new AtomicLong(writingFileNo.longValue());
 			this.readingOffset.set(0L);
 		}
 		
-		if(this.readingFileNo.longValue() >= 0) 
-		{
-			try 
-			{
-				String fileName = this._getDataFileName(this.readingFileNo.longValue());
+		if(this.readingFileNo.longValue() >= 0) {
+			try {
+				String fileName = getDataFileName(this.readingFileNo.longValue());
 				this.readingFile = new RandomAccessFile(new File(baseDir, fileName), "r");
 
 				long readPosition = readingOffset.longValue();
-				if(readPosition > 0L) 
-				{
+				if(readPosition > 0L) {
 					readingFile.seek(readPosition % blockSize == 0 ? readPosition : (readPosition / blockSize + 1) * blockSize);
 				}
-			} 
-			catch(IOException e) 
-			{
-				if(this.readingFile != null) 
-				{
-					try
-					{
+			} catch (IOException e) {
+				if(this.readingFile != null) {
+					try {
 						this.readingFile.close();
 						this.readingFile = null;
-					} 
-					catch(Exception e1) 
-					{
+					} catch (Exception e1) {
 						// ignore
 					}
 				}
 				
-				String fileName = this._getDataFileName(this.readingFileNo.longValue());
+				String fileName = getDataFileName(this.readingFileNo.longValue());
 				throw new IllegalStateException(String.format("File(%s) open fail",	fileName), e);
 			}
 		}
@@ -249,7 +191,7 @@ public class DataStoreImpl<E> implements DataStore<E>
 		if(content != null && content.length != 0) {
 			// 설정한 파일사이즈보다 새로운 파일을 생성
 			if(this.writingFile.length() >= this.maxFileSize) {
-				this._createNewWriteFile();
+				this.createNewWriteFile();
 			}
 
 			if(this.writingFile.length() % this.blockSize != 0) 
@@ -273,7 +215,7 @@ public class DataStoreImpl<E> implements DataStore<E>
 		{
 			if(this.readingFile == null) 
 			{
-				this._openReadingFile();
+				this.openReadingFile();
 			}
 
 			blockGroup = BlockGroup.read(this.readingFile, this.blockSize);
@@ -295,18 +237,18 @@ public class DataStoreImpl<E> implements DataStore<E>
 						{
 							try 
 							{
-								String fileName = this._getDataFileName(this.readingFileNo.longValue());
-								FileUtils.moveFileToDirectory(new File(baseDir, fileName), bakDir, true);
+								String fileName = this.getDataFileName(this.readingFileNo.longValue());
+								FileUtils.moveFileToDirectory(new File(baseDir, fileName), backDir, true);
 							} 
 							catch(IOException e) 
 							{
-								String fileName = this._getDataFileName(this.readingFileNo.longValue());
-								log.warn("Move file({}) to dir({}) fail.", new File(baseDir, fileName), bakDir);
+								String fileName = this.getDataFileName(this.readingFileNo.longValue());
+								log.warn("Move file({}) to dir({}) fail.", new File(baseDir, fileName), backDir);
 							}
 						} 
 						else 
 						{
-							String fileName = this._getDataFileName(this.readingFileNo.longValue());
+							String fileName = this.getDataFileName(this.readingFileNo.longValue());
 							FileUtils.deleteQuietly(new File(baseDir, fileName));
 						}
 					}
@@ -314,7 +256,7 @@ public class DataStoreImpl<E> implements DataStore<E>
 					this.readingFileNo.incrementAndGet();
 					this.readingOffset.set(0L);
 					
-					this._openReadingFile();
+					this.openReadingFile();
 					
 					return take();
 				}
@@ -355,7 +297,7 @@ public class DataStoreImpl<E> implements DataStore<E>
 			catch(IOException e) 
 			{
 				long fileNo = this.readingFileNo.longValue();
-				log.warn("Close reading file({}) fail.", this._getDataFileName(fileNo));
+				log.warn("Close reading file({}) fail.", this.getDataFileName(fileNo));
 			}
 		}
 
@@ -368,7 +310,7 @@ public class DataStoreImpl<E> implements DataStore<E>
 			catch(IOException e) 
 			{
 				long fileNo = this.writingFileNo.longValue();
-				log.warn("Close reading file({}) fail.", this._getDataFileName(fileNo));
+				log.warn("Close reading file({}) fail.", this.getDataFileName(fileNo));
 			}
 		}
 	}

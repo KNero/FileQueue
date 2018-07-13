@@ -29,37 +29,30 @@ public class FileQueueImpl<E> implements FileQueue<E>
 		this(null);
 	}
 
-	public FileQueueImpl(Config _config) 
-	{
-		if(_config == null) 
-		{
-			_config = new Config();
+	public FileQueueImpl(Config config) {
+		if(config == null) {
+			config = new Config();
 		}
 		
-		try 
-		{
-			this.metaHolder = new MetaHolderImpl(_config.getName(), _config.getBaseDir());
+		try {
+			this.metaHolder = new MetaHolderImpl(config.getName(), config.getBaseDir());
 			this.metaHolder.init();
 			
-			this.config = _config;
+			this.config = config;
 			this.config.setReadingFileNo(metaHolder.getReadingFileNo());
 			this.config.setReadingOffset(metaHolder.getReadingFileOffset());
 			
-			this.dataStore = new DataStoreImpl<E>(this.config);
+			this.dataStore = new DataStoreImpl<>(this.config);
 			this.dataStore.init();
-		} 
-		catch(IOException e) 
-		{
+		} catch (IOException e) {
 			throw new RuntimeException("FileQueue init fail.", e);
 		}
 	}
 	
-	public E poll() throws InterruptedException, IOException
-	{
+	public E poll() throws InterruptedException, IOException {
 		this.readLock.lockInterruptibly();
 		
-		try
-		{
+		try {
 			E res = this.dataStore.take();
 			if(res != null) 
 			{
@@ -67,9 +60,7 @@ public class FileQueueImpl<E> implements FileQueue<E>
 			}
 			
 			return res;
-		}
-		finally
-		{
+		} finally {
 			this.readLock.unlock();
 		}
 	}
