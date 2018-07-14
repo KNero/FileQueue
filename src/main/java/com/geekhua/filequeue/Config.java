@@ -15,15 +15,15 @@ public class Config {
     private int     msgAvgLen     = 1024;
     private long    readingFileNo = -1L;
     private long    readingOffset = 0L;
-    private long    fileSiz       = 1024 * 1024 * 100;
-    private boolean bakReadFile   = false; //readingFile을 모두 읽고 백업을 원한다면 true;
+    private long    fileSiz       = 1024 * 1024 * 100L;
+    private boolean isBackupReadFile;
 
-    public boolean isBakReadFile() {
-        return bakReadFile;
+    public boolean isBackupReadFile() {
+        return isBackupReadFile;
     }
 
-    public void setBakReadFile(boolean bakReadFile) {
-        this.bakReadFile = bakReadFile;
+    public void setBackupReadFile(boolean backupReadFile) {
+        this.isBackupReadFile = backupReadFile;
     }
 
     public long getFileSiz() {
@@ -110,7 +110,7 @@ public class Config {
 	public Config clone() 
 	{
 		Config conf = new Config();
-		conf.setBakReadFile(this.bakReadFile);
+		conf.setBackupReadFile(this.isBackupReadFile);
 		conf.setBaseDir(this.baseDir);
 		conf.setCodec(this.codec);
 		conf.setFileSiz(this.fileSiz);

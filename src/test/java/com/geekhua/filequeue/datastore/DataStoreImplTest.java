@@ -1,421 +1,176 @@
 package com.geekhua.filequeue.datastore;
 
-import java.io.File;
-import java.io.RandomAccessFile;
-import java.util.Collection;
-
-import org.apache.commons.io.FileUtils;
-import org.junit.After;
-import org.junit.Assert;
-
 import com.geekhua.filequeue.Config;
-import com.geekhua.filequeue.codec.Codec;
-import com.geekhua.filequeue.codec.ObjectCodec;
+import com.geekhua.filequeue.codec.ByteArrayCodec;
+import org.apache.commons.io.FileUtils;
+import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Test;
 
-/**
- * @author Leo Liang
- * 
- */
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 public class DataStoreImplTest {
-    private static final File   baseDir = new File("./target/fileque", "datastoreTest");
-    private static final byte[] DATAFILE_END_CONTENT = new byte[] { (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAA,
-            (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAB };
-    private static final byte[] HEADER               = new byte[] { (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAB };
-    private static final int    CHECKSUMLEN          = 20;
+    private static final File   baseDir = new File("target/fileque", "data-store-test");
 
     @Before
     public void before() throws Exception {
         if (baseDir.exists()) {
             FileUtils.deleteDirectory(baseDir);
         }
-        baseDir.mkdirs();
+        Assert.assertTrue(baseDir.mkdirs());
     }
 
-    @After
-    public void after() throws Exception {
-        if (baseDir.exists()) {
-            FileUtils.deleteDirectory(baseDir);
+    @Test
+    public void testStringPutAndTake() throws Exception {
+        Config config = new Config();
+        config.setBaseDir(baseDir.getAbsolutePath());
+
+        DataStore<String> ds = new DataStoreImpl<>(config);
+        try {
+	        ds.init();
+
+	        String content = "0123456789";
+	        for (int i = 0; i < 10; ++i) {
+		        ds.put(content);
+	        }
+
+	        for (int i = 0; i < 10; ++i) {
+		        String buf = ds.take();
+		        Assert.assertEquals(content, buf);
+	        }
+        } finally {
+	        ds.close();
         }
     }
 
-//    @Test
+    @Test
     @SuppressWarnings("unchecked")
-    public void testPutFileSwap() throws Exception {
-        Config config = new Config();
-        config.setMsgAvgLen(10);
-        config.setBaseDir(baseDir.getAbsolutePath());
-        config.setFileSiz(10);
-        DataStore<String> ds = new DataStoreImpl<String>(config);
-        ds.init();
-        String content = "0123456789";
-        for (int i = 0; i < 2; i++) {
-            ds.put(content);
-        }
-        Collection<File> listFiles = (Collection<File>) FileUtils.listFiles(baseDir, new String[] { "fq" }, true);
+	public void testMapPutAndTake() throws Exception {
+	    Config config = new Config();
+	    config.setBaseDir(baseDir.getAbsolutePath());
 
-        Assert.assertEquals(2, listFiles.size());
+	    DataStore<Map> ds = new DataStoreImpl<>(config);
+	    try {
+		    ds.init();
 
-        int i = 0;
+		    List<String> list = new ArrayList<>();
+		    list.add("a");
+		    list.add("b");
 
-        for (File file : listFiles) {
-            RandomAccessFile fis = new RandomAccessFile(file, "r");
-            BlockGroup blockGroup = BlockGroup.read(fis, BlockGroup.estimateBlockSize(10));
-            Codec codec = new ObjectCodec();
-            Assert.assertEquals(content, codec.decode(blockGroup.getContent()));
+		    Map<String, Object> data = new HashMap<>();
+		    data.put("String", "String");
+		    data.put("Integer", 1234);
+		    data.put("List", list);
 
-            if (i == 0) {
-                blockGroup = BlockGroup.read(fis, BlockGroup.estimateBlockSize(10));
-                Assert.assertArrayEquals(getEndBlockGroup().getContent(), blockGroup.getContent());
-            }
-            fis.close();
-            i++;
-        }
+		    ds.put(data);
+		    Map<String, Object> take = ds.take();
+
+		    Assert.assertEquals(data.get("String"), take.get("String"));
+		    Assert.assertEquals(data.get("Integer"), take.get("Integer"));
+		    List takeList = (List) take.get("List");
+		    Assert.assertEquals(list, takeList);
+	    } finally {
+		    ds.close();
+	    }
     }
 
-    @SuppressWarnings("unchecked")
-//    @Test
-    public void testPutCorruptFile() throws Exception {
-        Config config = new Config();
-        config.setMsgAvgLen(10);
-        config.setBaseDir(baseDir.getAbsolutePath());
-        config.setFileSiz(40);
-        DataStore<byte[]> ds = new DataStoreImpl<byte[]>(config);
-        ds.init();
-        byte[] content = new byte[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
-        Collection<File> listFiles = (Collection<File>) FileUtils.listFiles(baseDir, new String[] { "fq" }, true);
-        if (listFiles.isEmpty() || listFiles.size() != 1) {
-            Assert.fail();
-        } else {
-            RandomAccessFile file = new RandomAccessFile(listFiles.iterator().next(), "rw");
-            file.write(new byte[] { 1, 2, 3 });
-            ds.put(content);
-            Codec codec = new ObjectCodec();
-            int contentLen = codec.encode(content).length + HEADER.length + CHECKSUMLEN + 4;
-            Assert.assertEquals(
-                    BlockGroup.estimateBlockSize(10)
-                            + (contentLen / BlockGroup.estimateBlockSize(10) + (contentLen
-                                    % BlockGroup.estimateBlockSize(10) == 0 ? 0 : 1))
-                            * BlockGroup.estimateBlockSize(10), file.length());
-            file.seek(0);
-            BlockGroup blockGroup = BlockGroup.read(file, BlockGroup.estimateBlockSize(10));
-            Assert.assertArrayEquals(content, (byte[]) codec.decode(blockGroup.getContent()));
-            file.close();
-        }
+    @Test
+	public void testCreateNewWriteFileAndBackup() throws Exception {
+	    Config config = new Config();
+	    config.setBaseDir(baseDir.getAbsolutePath());
+	    config.setCodec(new ByteArrayCodec());
+	    config.setMsgAvgLen(10);
+	    config.setFileSiz(100);
+	    config.setBackupReadFile(true);
+	    byte[] data = "18573957538474".getBytes();
+
+	    DataStore<byte[]> ds = new DataStoreImpl<>(config);
+	    try {
+		    ds.init();
+
+		    for (int i = 0; i < 20; ++i) {
+			    ds.put(data);
+		    }
+	    } finally {
+		    ds.close();
+	    }
+
+	    ds = new DataStoreImpl<>(config);
+	    try {
+		    ds.init();
+
+		    for (int i = 0; i < 20; ++i) {
+			    Assert.assertTrue(Arrays.equals(data, ds.take()));
+		    }
+
+		    Assert.assertNull(ds.take());
+
+		    data = "1023829874837483742".getBytes();
+		    ds.put(data);
+		    Assert.assertTrue(Arrays.equals(data, ds.take()));
+		    Assert.assertEquals(ds.readingFileNo(), ds.writingFileNo());
+		    Assert.assertEquals(ds.readingFileOffset(), ds.writingFileOffset());
+	    } finally {
+		    ds.close();
+	    }
     }
 
-    @SuppressWarnings("unchecked")
-//    @Test
-    public void testLastDataFileRecover() throws Exception {
-        Config config = new Config();
-        config.setMsgAvgLen(10);
-        config.setBaseDir(baseDir.getAbsolutePath());
-        config.setFileSiz(40);
-        DataStore<byte[]> ds = new DataStoreImpl<byte[]>(config);
-        ds.init();
-        Collection<File> listFiles = (Collection<File>) FileUtils.listFiles(baseDir, new String[] { "fq" }, true);
-        if (listFiles.isEmpty() || listFiles.size() != 1) {
-            Assert.fail();
-        } else {
-            RandomAccessFile file = new RandomAccessFile(listFiles.iterator().next(), "rw");
-            file.write(new byte[] { 1, 2, 3 });
-            ds = new DataStoreImpl<byte[]>(config);
-            ds.init();
+	@Test
+	public void testCreateNewWriteFileAndNoBackup() throws Exception {
+		Config config = new Config();
+		config.setBaseDir(baseDir.getAbsolutePath());
+		config.setCodec(new ByteArrayCodec());
+		config.setMsgAvgLen(10);
+		config.setFileSiz(100);
 
-            file.seek(0);
+		DataStore<byte[]> ds = new DataStoreImpl<>(config);
+		try {
+			ds.init();
 
-            BlockGroup blockGroup = BlockGroup.read(file, BlockGroup.estimateBlockSize(10));
-            Assert.assertArrayEquals(getEndBlockGroup().getContent(), blockGroup.getContent());
-            file.close();
-        }
+			byte[] data = "18573957538474".getBytes();
 
-    }
+			for (int i = 0; i < 20; ++i) {
+				ds.put(data);
+			}
 
-    @SuppressWarnings("unchecked")
-//    @Test
-    public void testLastDataFileRecover2() throws Exception {
-        Config config = new Config();
-        config.setMsgAvgLen(10);
-        config.setBaseDir(baseDir.getAbsolutePath());
-        config.setFileSiz(40);
-        DataStore<byte[]> ds = new DataStoreImpl<byte[]>(config);
-        ds.init();
-        byte[] content = new byte[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
-        ds.put(content);
-        Collection<File> listFiles = (Collection<File>) FileUtils.listFiles(baseDir, new String[] { "fq" }, true);
-        if (listFiles.isEmpty() || listFiles.size() != 1) {
-            Assert.fail();
-        } else {
-            RandomAccessFile file = new RandomAccessFile(listFiles.iterator().next(), "rw");
-            file.seek(file.length());
-            file.write(new byte[] { 1, 2, 3 });
-            ds = new DataStoreImpl<byte[]>(config);
-            ds.init();
+			for (int i = 0; i < 20; ++i) {
+				Assert.assertTrue(Arrays.equals(data, ds.take()));
+			}
+		} finally {
+			ds.close();
+		}
+	}
 
-            file.seek(0);
+	@Test(expected = IOException.class)
+	public void testFailInit() throws Exception {
+    	Config config = new Config();
+		config.setBaseDir(baseDir.getAbsolutePath());
+		config.setMsgAvgLen(20);
+		config.setFileSiz(200);
+		String data = "123456";
 
-            Codec codec = new ObjectCodec();
-            BlockGroup blockGroup = BlockGroup.read(file, BlockGroup.estimateBlockSize(10));
-            Assert.assertArrayEquals(content, (byte[]) codec.decode(blockGroup.getContent()));
-            blockGroup = BlockGroup.read(file, BlockGroup.estimateBlockSize(10));
-            Assert.assertArrayEquals(getEndBlockGroup().getContent(), blockGroup.getContent());
-            file.close();
-        }
-    }
+		DataStore<String> ds = new DataStoreImpl<>(config);
+		try {
+			ds.init();
+			ds.put(data);
+		} finally {
+			ds.close();
+		}
 
-    @SuppressWarnings("unchecked")
-//    @Test
-    public void testLastDataFileRecover3() throws Exception {
-        Config config = new Config();
-        config.setMsgAvgLen(5);
-        config.setBaseDir(baseDir.getAbsolutePath());
-        config.setFileSiz(400);
-        DataStore<byte[]> ds = new DataStoreImpl<byte[]>(config);
-        ds.init();
-        byte[] content = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 };
-        ds.put(content);
-        Collection<File> listFiles = (Collection<File>) FileUtils.listFiles(baseDir, new String[] { "fq" }, true);
-        if (listFiles.isEmpty() || listFiles.size() != 1) {
-            Assert.fail();
-        } else {
-            ds = new DataStoreImpl<byte[]>(config);
-            ds.init();
+		// 메시지의 길이가 맞지 않으면 파일을 읽을 수 없기 때문에 초기화 과정에서 에러가 발생한다.
+		config.setMsgAvgLen(10);
 
-            RandomAccessFile file = new RandomAccessFile(listFiles.iterator().next(), "rw");
-            Codec codec = new ObjectCodec();
-            BlockGroup blockGroup = BlockGroup.read(file, BlockGroup.estimateBlockSize(5));
-            Assert.assertArrayEquals(content, (byte[]) codec.decode(blockGroup.getContent()));
-        }
-
-    }
-
-    @SuppressWarnings("unchecked")
-//    @Test
-    public void testLastDataFileRecover4() throws Exception {
-        Config config = new Config();
-        config.setMsgAvgLen(5);
-        config.setBaseDir(baseDir.getAbsolutePath());
-        config.setFileSiz(100);
-        DataStore<byte[]> ds = new DataStoreImpl<byte[]>(config);
-        ds.init();
-
-        byte[] dataArray = new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 1, 2, 3,
-				4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
-				13, 14, 15, 16, 17, 18, 19, 20, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 };
-
-        BlockGroup block = BlockGroup.allocate(dataArray, BlockGroup.estimateBlockSize(5));
-        byte[] content = block.array();
-        byte[] corruptContent = new byte[content.length - 120];
-        System.arraycopy(content, 0, corruptContent, 0, content.length - 120);
-
-        Collection<File> listFiles = (Collection<File>) FileUtils.listFiles(baseDir, new String[] { "fq" }, true);
-        if (listFiles.isEmpty() || listFiles.size() != 1) {
-            Assert.fail();
-        } else {
-            RandomAccessFile file = new RandomAccessFile(listFiles.iterator().next(), "rw");
-            file.write(corruptContent);
-            ds = new DataStoreImpl<byte[]>(config);
-            ds.init();
-            ds.put(new byte[] { 1, 2, 3 });
-
-            byte[] read = ds.take();
-            
-            file.close();
-
-            Assert.assertArrayEquals(new byte[] { 1, 2, 3 }, read);
-        }
-
-    }
-
-//    @Test
-    public void testTake() throws Exception {
-        Config config = new Config();
-        config.setMsgAvgLen(10);
-        config.setBaseDir(baseDir.getAbsolutePath());
-        config.setFileSiz(20);
-        DataStore<Integer> ds = new DataStoreImpl<Integer>(config);
-        ds.init();
-        int times = 10;
-        for (int i = 0; i < times; i++) {
-            ds.put(i);
-        }
-
-        for (int i = 0; i < times; i++) {
-            Assert.assertEquals(Integer.valueOf(i), ds.take());
-        }
-    }
-
-//    @Test
-    public void testTakeWhileWriting() throws Exception {
-        Config config = new Config();
-        config.setMsgAvgLen(10);
-        config.setBaseDir(baseDir.getAbsolutePath());
-        config.setFileSiz(20);
-        DataStore<Integer> ds = new DataStoreImpl<Integer>(config);
-        ds.init();
-        int times = 10;
-        for (int i = 0; i < times; i++) {
-            ds.put(i);
-            Assert.assertEquals(Integer.valueOf(i), ds.take());
-            Assert.assertNull(ds.take());
-        }
-
-    }
-
-//    @Test
-    public void testTake2() throws Exception {
-        Config config = new Config();
-        config.setMsgAvgLen(100);
-        config.setBaseDir(baseDir.getAbsolutePath());
-        config.setFileSiz(1024);
-        DataStore<Integer> ds = new DataStoreImpl<Integer>(config);
-        ds.init();
-        int times = 1000;
-        for (int i = 0; i < times; i++) {
-            ds.put(i);
-        }
-
-        for (int i = 0; i < times; i++) {
-            Assert.assertEquals(Integer.valueOf(i), ds.take());
-        }
-    }
-
-//    @Test
-    public void testTakeWhileWriting2() throws Exception {
-        Config config = new Config();
-        config.setMsgAvgLen(100);
-        config.setBaseDir(baseDir.getAbsolutePath());
-        config.setFileSiz(1024);
-        DataStore<Integer> ds = new DataStoreImpl<Integer>(config);
-        ds.init();
-        int times = 1000;
-        for (int i = 0; i < times; i++) {
-            ds.put(i);
-            Assert.assertEquals(Integer.valueOf(i), ds.take());
-            Assert.assertNull(ds.take());
-        }
-
-    }
-
-    @SuppressWarnings("unchecked")
-//    @Test
-    public void testDeleteReadFile() throws Exception {
-        Config config = new Config();
-        config.setMsgAvgLen(10);
-        config.setBaseDir(baseDir.getAbsolutePath());
-        config.setFileSiz(38);
-        DataStore<byte[]> ds = new DataStoreImpl<byte[]>(config);
-        ds.init();
-        byte[] content = new byte[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
-        int times = 100;
-        for (int i = 0; i < times; i++) {
-            ds.put(content);
-        }
-
-        Collection<File> listFiles = (Collection<File>) FileUtils.listFiles(baseDir, new String[] { "fq" }, true);
-        Assert.assertEquals(times, listFiles.size());
-
-        for (int i = 0; i < times; i++) {
-            ds.take();
-            listFiles = (Collection<File>) FileUtils.listFiles(baseDir, new String[] { "fq" }, true);
-            Assert.assertEquals(times - i, listFiles.size());
-        }
-
-        listFiles = (Collection<File>) FileUtils.listFiles(baseDir, new String[] { "fq" }, true);
-        Assert.assertEquals(1, listFiles.size());
-    }
-
-    @SuppressWarnings("unchecked")
-//    @Test
-    public void testBakReadFile() throws Exception {
-        Config config = new Config();
-        config.setMsgAvgLen(10);
-        config.setBaseDir(baseDir.getAbsolutePath());
-        config.setFileSiz(38);
-        config.setBakReadFile(true);
-        DataStore<byte[]> ds = new DataStoreImpl<byte[]>(config);
-        ds.init();
-        byte[] content = new byte[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
-        int times = 100;
-        for (int i = 0; i < times; i++) {
-            ds.put(content);
-        }
-
-        Collection<File> dataFiles = (Collection<File>) FileUtils.listFiles(new File(baseDir, "default/data"),
-                new String[] { "fq" }, true);
-        Collection<File> bakFiles = (Collection<File>) FileUtils.listFiles(new File(baseDir, "default/bak"),
-                new String[] { "fq" }, true);
-        Assert.assertEquals(times, dataFiles.size());
-        Assert.assertTrue(bakFiles.isEmpty());
-
-        for (int i = 0; i < times; i++) {
-            ds.take();
-            dataFiles = (Collection<File>) FileUtils.listFiles(new File(baseDir, "default/data"),
-                    new String[] { "fq" }, true);
-            bakFiles = (Collection<File>) FileUtils.listFiles(new File(baseDir, "default/bak"), new String[] { "fq" },
-                    true);
-            Assert.assertEquals(times - i, dataFiles.size());
-            Assert.assertEquals(i, bakFiles.size());
-        }
-
-        dataFiles = (Collection<File>) FileUtils.listFiles(new File(baseDir, "default/data"), new String[] { "fq" },
-                true);
-        bakFiles = (Collection<File>) FileUtils
-                .listFiles(new File(baseDir, "default/bak"), new String[] { "fq" }, true);
-        Assert.assertEquals(1, dataFiles.size());
-        Assert.assertEquals(times - 1, bakFiles.size());
-    }
-
-//    @Test
-    public void testWriteSpeed() throws Exception {
-        Config config = new Config();
-        config.setMsgAvgLen(1024);
-        config.setBaseDir(baseDir.getAbsolutePath());
-        config.setFileSiz(1024 * 1024 * 500);
-        DataStore<byte[]> ds = new DataStoreImpl<byte[]>(config);
-        byte[] content = new byte[1024];
-        for (int i = 0; i < 1024; i++) {
-            content[i] = 0x55;
-        }
-        ds.init();
-        int times = 100000;
-        long start = System.currentTimeMillis();
-        for (int i = 0; i < times; i++) {
-            ds.put(content);
-        }
-        System.out.println("[Write]Time spend " + (System.currentTimeMillis() - start) + "ms for " + times
-                + " times. Avg msg length 1024bytes, each data file 500MB.");
-
-    }
-
-//    @Test
-    public void testReadSpeed() throws Exception {
-        Config config = new Config();
-        config.setMsgAvgLen(1024);
-        config.setBaseDir(baseDir.getAbsolutePath());
-        config.setFileSiz(1024 * 1024 * 500);
-        DataStore<byte[]> ds = new DataStoreImpl<byte[]>(config);
-        byte[] content = new byte[1024];
-        for (int i = 0; i < 1024; i++) {
-            content[i] = 0x55;
-        }
-        ds.init();
-        int times = 100000;
-
-        for (int i = 0; i < times; i++) {
-            ds.put(content);
-        }
-
-        long start = System.currentTimeMillis();
-        for (int i = 0; i < times; i++) {
-            ds.take();
-        }
-        System.out.println("[Read]Time spend " + (System.currentTimeMillis() - start) + "ms for " + times
-                + " times. Avg msg length 1024bytes, each data file 500MB.");
-
-    }
-
-    private BlockGroup getEndBlockGroup() {
-        return BlockGroup.allocate(DATAFILE_END_CONTENT, 10);
-    }
+		ds = new DataStoreImpl<>(config);
+		try {
+			ds.init();
+		} finally {
+			ds.close();
+		}
+	}
 }

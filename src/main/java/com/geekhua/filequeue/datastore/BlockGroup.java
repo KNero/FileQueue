@@ -44,8 +44,8 @@ public class BlockGroup
 		return blockSize;
 	}
 
-	public static int estimateBlockSize(int _contentSize) {
-		return HEADER.length + CONTENT_CHECKSUM_SIZE_LEN + _contentSize + CHECKSUM_LEN;
+	static int estimateBlockSize(int contentSize) {
+		return HEADER.length + CONTENT_CHECKSUM_SIZE_LEN + contentSize + CHECKSUM_LEN;
 	}
 
 	/**

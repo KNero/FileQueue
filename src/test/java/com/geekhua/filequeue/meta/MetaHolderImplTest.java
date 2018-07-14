@@ -18,8 +18,10 @@ import org.junit.Test;
 public class MetaHolderImplTest {
     @Test
     public void testReadWrite() throws IOException {
-        boolean isDelete = new File("target/fileque/test-meta/meta/meta").delete();
-        Assert.assertTrue(isDelete);
+    	File file = new File("target/fileque/test-meta/meta/meta");
+    	if (file.exists()) {
+		    Assert.assertTrue(file.delete());
+	    }
 
         MetaHolderImpl metaHolder = new MetaHolderImpl("test-meta", "target/fileque");
         metaHolder.init();
