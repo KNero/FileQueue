@@ -44,7 +44,7 @@ public class DataStoreImpl<E> implements DataStore<E> {
 		this.baseDir = new File(new File(config.getBaseDir(), name), DATAFILE_DIRNAME);
 
 		final byte[] endContent = new byte[] {(byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAB};
-		this.blockSize = BlockGroup.estimateBlockSize(config.getMsgAvgLen());
+		this.blockSize = BlockGroup.estimateBlockGroupSize(config.getMsgAvgLen());
 		endBlock = BlockGroup.allocate(endContent, blockSize).array();
 
 		this.readingFileNo = new AtomicLong(config.getReadingFileNo());
