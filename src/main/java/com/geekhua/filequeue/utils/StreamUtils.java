@@ -13,7 +13,7 @@ public class StreamUtils {
 
     }
 
-	public static int readFully(RandomAccessFile file, byte[] buf, int offset, int length) throws IOException {
+	public static void readFully(RandomAccessFile file, byte[] buf, int offset, int length) throws IOException {
 		if(length < 0) {
 			throw new IndexOutOfBoundsException();
 		}
@@ -26,7 +26,5 @@ public class StreamUtils {
 			}
 			n += count;
 		}
-
-		return n;
 	}
 }

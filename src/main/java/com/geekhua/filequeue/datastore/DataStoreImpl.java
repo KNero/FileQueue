@@ -39,7 +39,7 @@ public class DataStoreImpl<E> implements DataStore<E> {
 	private AtomicLong writingFileNo = new AtomicLong(-1L);
 	private RandomAccessFile writingFile = null;
 
-	public DataStoreImpl(Config config) {
+	public DataStoreImpl(Config config, long readingFileNo, long readingOffset) {
 		String name = config.getName();
 		this.baseDir = new File(new File(config.getBaseDir(), name), DATAFILE_DIRNAME);
 
@@ -47,8 +47,8 @@ public class DataStoreImpl<E> implements DataStore<E> {
 		this.blockSize = BlockGroup.estimateBlockGroupSize(config.getMsgAvgLen());
 		endBlock = BlockGroup.allocate(endContent, blockSize).array();
 
-		this.readingFileNo = new AtomicLong(config.getReadingFileNo());
-		this.readingOffset = new AtomicLong(config.getReadingOffset());
+		this.readingFileNo = new AtomicLong(readingFileNo);
+		this.readingOffset = new AtomicLong(readingOffset);
 		this.codec = config.getCodec();
 		this.maxFileSize = config.getFileSize();
 		this.isBackupReadFile = config.isBackupReadFile();

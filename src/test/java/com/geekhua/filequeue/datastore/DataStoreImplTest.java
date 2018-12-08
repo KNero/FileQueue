@@ -31,7 +31,7 @@ public class DataStoreImplTest {
         Config config = new Config();
         config.setBaseDir(baseDir.getAbsolutePath());
 
-        DataStore<String> ds = new DataStoreImpl<>(config);
+        DataStore<String> ds = new DataStoreImpl<>(config, 0, 0);
         try {
 	        ds.init();
 
@@ -55,7 +55,7 @@ public class DataStoreImplTest {
 	    Config config = new Config();
 	    config.setBaseDir(baseDir.getAbsolutePath());
 
-	    DataStore<Map> ds = new DataStoreImpl<>(config);
+	    DataStore<Map> ds = new DataStoreImpl<>(config, 0, 0);
 	    try {
 		    ds.init();
 
@@ -90,7 +90,7 @@ public class DataStoreImplTest {
 	    config.setBackupReadFile(true);
 	    byte[] data = "18573957538474".getBytes();
 
-	    DataStore<byte[]> ds = new DataStoreImpl<>(config);
+	    DataStore<byte[]> ds = new DataStoreImpl<>(config, 0, 0);
 	    try {
 		    ds.init();
 
@@ -101,7 +101,7 @@ public class DataStoreImplTest {
 		    ds.close();
 	    }
 
-	    ds = new DataStoreImpl<>(config);
+	    ds = new DataStoreImpl<>(config, 0, 0);
 	    try {
 		    ds.init();
 
@@ -129,7 +129,7 @@ public class DataStoreImplTest {
 		config.setMsgAvgLen(10);
 		config.setFileSiz(100);
 
-		DataStore<byte[]> ds = new DataStoreImpl<>(config);
+		DataStore<byte[]> ds = new DataStoreImpl<>(config, 0, 0);
 		try {
 			ds.init();
 
@@ -155,7 +155,7 @@ public class DataStoreImplTest {
 		config.setFileSiz(200);
 		String data = "123456";
 
-		DataStore<String> ds = new DataStoreImpl<>(config);
+		DataStore<String> ds = new DataStoreImpl<>(config, 0, 0);
 		try {
 			ds.init();
 			ds.put(data);
@@ -166,7 +166,7 @@ public class DataStoreImplTest {
 		// 메시지의 길이가 맞지 않으면 파일을 읽을 수 없기 때문에 초기화 과정에서 에러가 발생한다.
 		config.setMsgAvgLen(10);
 
-		ds = new DataStoreImpl<>(config);
+		ds = new DataStoreImpl<>(config, 0, 0);
 		try {
 			ds.init();
 		} finally {

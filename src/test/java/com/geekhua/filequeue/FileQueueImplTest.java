@@ -27,31 +27,13 @@ import com.geekhua.filequeue.exception.FileQueueClosedException;
 public class FileQueueImplTest {
     private static final File baseDir = new File("./fileque");
 
-    // private static final File baseDir = new
-    // File("/Volumes/HDD/data/appdatas");
-
-    // @Before
-    // public void before() throws Exception {
-    // if (baseDir.exists()) {
-    // FileUtils.deleteQuietly(baseDir);
-    // }
-    // baseDir.mkdirs();
-    // }
-    //
-    // @After
-    // public void after() throws Exception {
-    // if (baseDir.exists()) {
-    // FileUtils.deleteQuietly(baseDir);
-    // }
-    // }
-
     @Test
     public void testAdd() throws Exception {
         Config config = new Config();
         config.setBaseDir(baseDir.getAbsolutePath());
         config.setMsgAvgLen(10);
         config.setName("testAdd");
-        FileQueue<String> fq = new FileQueueImpl<String>(config);
+        FileQueue<String> fq = new FileQueueImpl<>(config);
         fq.add("ssss");
         Assert.assertEquals("ssss", fq.get());
         fq.close();
@@ -63,7 +45,7 @@ public class FileQueueImplTest {
         config.setBaseDir(baseDir.getAbsolutePath());
         config.setMsgAvgLen(10);
         config.setName("testAddObj");
-        FileQueue<MyObject> fq = new FileQueueImpl<MyObject>(config);
+        FileQueue<MyObject> fq = new FileQueueImpl<>(config);
         for (int i = 0; i < 10000; i++) {
             fq.add(new MyObject());
         }
@@ -75,7 +57,7 @@ public class FileQueueImplTest {
     	config.setBaseDir(baseDir.getAbsolutePath());
     	config.setMsgAvgLen(10);
     	config.setName("testAddObjMultThread");
-    	final FileQueue<MyObject> fq = new FileQueueImpl<MyObject>(config);
+    	final FileQueue<MyObject> fq = new FileQueueImpl<>(config);
     	ExecutorService executorService = Executors.newFixedThreadPool(20);
     	final int threads = 20;
     	final int max = 10000;
@@ -106,7 +88,7 @@ public class FileQueueImplTest {
         config.setMsgAvgLen(10);
         config.setName("testAddMultiFiles");
         config.setFileSiz(1024);
-        FileQueue<Integer> fq = new FileQueueImpl<Integer>(config);
+        FileQueue<Integer> fq = new FileQueueImpl<>(config);
         int times = 1000;
         for (int i = 0; i < times; i++) {
             fq.add(i);
@@ -125,7 +107,7 @@ public class FileQueueImplTest {
         config.setMsgAvgLen(10);
         config.setName("testGetTimeout");
         config.setFileSiz(1024);
-        FileQueue<Integer> fq = new FileQueueImpl<Integer>(config);
+        FileQueue<Integer> fq = new FileQueueImpl<>(config);
 
         long start = System.currentTimeMillis();
         Integer res = fq.get(1, TimeUnit.SECONDS);
@@ -143,7 +125,7 @@ public class FileQueueImplTest {
         config.setName("testQueueRestart");
         // single data file
         config.setFileSiz(1024 * 1024 * 1000);
-        FileQueue<Integer> fq = new FileQueueImpl<Integer>(config);
+        FileQueue<Integer> fq = new FileQueueImpl<>(config);
         for (int i = 0; i < times; i++) {
             fq.add(i);
         }
@@ -154,7 +136,7 @@ public class FileQueueImplTest {
 
         fq.close();
 
-        fq = new FileQueueImpl<Integer>(config);
+        fq = new FileQueueImpl<>(config);
         for (int i = times / 2; i < times; i++) {
             Assert.assertEquals(Integer.valueOf(i), fq.get());
         }
@@ -169,7 +151,7 @@ public class FileQueueImplTest {
         config.setName("testQueueRestart2");
         // multi data files
         config.setFileSiz(10);
-        FileQueue<Integer> fq = new FileQueueImpl<Integer>(config);
+        FileQueue<Integer> fq = new FileQueueImpl<>(config);
         for (int i = 0; i < times; i++) {
             fq.add(i);
         }
@@ -181,7 +163,7 @@ public class FileQueueImplTest {
         fq.close();
         Thread.sleep(5000);
 
-        fq = new FileQueueImpl<Integer>(config);
+        fq = new FileQueueImpl<>(config);
         for (int i = times / 2; i < times; i++) {
             Assert.assertEquals(Integer.valueOf(i), fq.get());
         }
@@ -195,7 +177,7 @@ public class FileQueueImplTest {
         config.setBaseDir(baseDir.getAbsolutePath());
         config.setFileSiz(1024 * 1024 * 500);
         config.setName("testWriteSpeed");
-        FileQueue<byte[]> fq = new FileQueueImpl<byte[]>(config);
+        FileQueue<byte[]> fq = new FileQueueImpl<>(config);
         byte[] content = new byte[1024];
         for (int i = 0; i < 1024; i++) {
             content[i] = 0x55;
@@ -218,7 +200,7 @@ public class FileQueueImplTest {
         config.setFileSiz(1024 * 1024 * 500);
         config.setName("testReadSpeed");
         
-        FileQueue<byte[]> fq = new FileQueueImpl<byte[]>(config);
+        FileQueue<byte[]> fq = new FileQueueImpl<>(config);
         byte[] content = new byte[1024];
         for (int i = 0; i < 1024; i++) {
             content[i] = 0x55;
@@ -246,7 +228,7 @@ public class FileQueueImplTest {
         config.setFileSiz(1024 * 1024 * 500);
         config.setName("testReadWriteSpeed");
         
-        FileQueue<byte[]> fq = new FileQueueImpl<byte[]>(config);
+        FileQueue<byte[]> fq = new FileQueueImpl<>(config);
         byte[] content = new byte[1024];
         for (int i = 0; i < 1024; i++) {
             content[i] = 0x55;
@@ -274,7 +256,7 @@ public class FileQueueImplTest {
         config.setBaseDir(baseDir.getAbsolutePath());
         config.setName("concurrentTestReadFasterThanWrite");
 
-        final FileQueue<TestObject> fq = new FileQueueImpl<TestObject>(config);
+        final FileQueue<TestObject> fq = new FileQueueImpl<>(config);
         final Set<TestObject> results = Collections.synchronizedSet(new TreeSet<TestObject>());
 
         final Set<TestObject> expected = Collections.synchronizedSet(new TreeSet<TestObject>());
@@ -285,7 +267,6 @@ public class FileQueueImplTest {
         for (int i = 0; i < writerCount; i++) {
             final int threadNum = i;
             Thread writerThread = new Thread(new Runnable() {
-
                 public void run() {
                     try {
                         startLatch.await();

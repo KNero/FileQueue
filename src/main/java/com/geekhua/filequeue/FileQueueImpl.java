@@ -1,52 +1,32 @@
 package com.geekhua.filequeue;
 
-import java.io.IOException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.ReentrantLock;
-
 import com.geekhua.filequeue.datastore.DataStore;
 import com.geekhua.filequeue.datastore.DataStoreImpl;
 import com.geekhua.filequeue.exception.FileQueueClosedException;
 import com.geekhua.filequeue.meta.MetaHolder;
 import com.geekhua.filequeue.meta.MetaHolderImpl;
 
-/**
- * 
- * @author Leo Liang
- * 
- */
-public class FileQueueImpl<E> implements FileQueue<E> 
-{
+import java.io.IOException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
+
+public class FileQueueImpl<E> implements FileQueue<E> {
 	private DataStore<E> dataStore;
-	private Config config;
 	private MetaHolder metaHolder;
-	private volatile boolean stopped = false;
+	private volatile boolean isStopped = false;
 	private final ReentrantLock writeLock = new ReentrantLock();
 	private final ReentrantLock readLock = new ReentrantLock();
 
-	public FileQueueImpl() 
-	{
-		this(null);
-	}
-
-	public FileQueueImpl(Config config) {
+	public FileQueueImpl(Config config) throws IOException{
 		if(config == null) {
 			config = new Config();
 		}
-		
-		try {
-			this.metaHolder = new MetaHolderImpl(config.getName(), config.getBaseDir());
-			this.metaHolder.init();
-			
-			this.config = config;
-			this.config.setReadingFileNo(metaHolder.getReadingFileNo());
-			this.config.setReadingOffset(metaHolder.getReadingFileOffset());
-			
-			this.dataStore = new DataStoreImpl<>(this.config);
-			this.dataStore.init();
-		} catch (IOException e) {
-			throw new RuntimeException("FileQueue init fail.", e);
-		}
+
+		this.metaHolder = new MetaHolderImpl(config.getName(), config.getBaseDir());
+		this.metaHolder.init();
+
+		this.dataStore = new DataStoreImpl<>(config, metaHolder.getReadingFileNo(), metaHolder.getReadingFileOffset());
+		this.dataStore.init();
 	}
 	
 	public E poll() throws InterruptedException, IOException {
@@ -54,8 +34,7 @@ public class FileQueueImpl<E> implements FileQueue<E>
 		
 		try {
 			E res = this.dataStore.take();
-			if(res != null) 
-			{
+			if(res != null) {
 				this.metaHolder.update(dataStore.readingFileNo(), dataStore.readingFileOffset());
 			}
 			
@@ -65,21 +44,15 @@ public class FileQueueImpl<E> implements FileQueue<E>
 		}
 	}
 
-	public E get() throws InterruptedException, IOException 
-	{
+	public E get() throws InterruptedException, IOException {
 		this.readLock.lockInterruptibly();
 		
-		try 
-		{
-			E res = null;
-			while(res == null) 
-			{
-				res = dataStore.take();
-				
-				if(res != null) 
-				{
+		try {
+			while(!isStopped) {
+				E res = dataStore.take();
+
+				if(res != null) {
 					this.metaHolder.update(dataStore.readingFileNo(), dataStore.readingFileOffset());
-					
 					return res;
 				}
 				// Since res == null not only caused by queue empty,
@@ -88,110 +61,85 @@ public class FileQueueImpl<E> implements FileQueue<E>
 				// LinkedBlockingQueue.poll
 				TimeUnit.NANOSECONDS.sleep(1000);
 			}
-			
+
 			return null;
-		} 
-		finally 
-		{
+		} finally {
 			this.readLock.unlock();
 		}
 	}
 
-	public E get(long _timeout, TimeUnit _unit) throws InterruptedException, IOException 
-	{
+	public E get(long timeout, TimeUnit unit) throws InterruptedException, IOException {
 		long startNanos = System.nanoTime();
-		long timeoutNanos = _unit.toNanos(_timeout);
+		long timeoutNanos = unit.toNanos(timeout);
 		this.readLock.lockInterruptibly();
 		
-		try 
-		{
-			E res = null;
-			while(res == null) 
-			{
-				res = this.dataStore.take();
+		try {
+			while(!isStopped) {
+				E res = this.dataStore.take();
 				
-				if(res != null) 
-				{
+				if(res != null) {
 					this.metaHolder.update(dataStore.readingFileNo(), dataStore.readingFileOffset());
-					
 					return res;
-				} 
-				else 
-				{
+				} else {
 					// Since res == null not only caused by queue empty,
 					// but also last msg not flush to disk completely. We
 					// couldn't wait until not empty like
 					// LinkedBlockingQueue.poll
-					if(System.nanoTime() - startNanos < timeoutNanos) 
-					{
+					if(System.nanoTime() - startNanos < timeoutNanos) {
 						TimeUnit.NANOSECONDS.sleep(100);
-					}
-					else
-					{
+					} else {
 						return null;
 					}
 				}
 			}
-			
+
 			return null;
-		} 
-		finally 
-		{
+		} finally {
 			this.readLock.unlock();
 		}
 	}
 
-	public void add(E m) throws IOException, FileQueueClosedException 
-	{
+	public void add(E m) throws IOException, FileQueueClosedException {
 		this.writeLock.lock();
 
 		try{
-			if(this.stopped) 
-			{
+			if(this.isStopped) {
 				throw new FileQueueClosedException();
 			}
 
 			this.dataStore.put(m);
-		} 
-		finally 
-		{
+		} finally {
 			this.writeLock.unlock();
 		}
 	}
 
-	public void close() throws IOException
-	{
-		this.writeLock.lock();
+	public void close() throws IOException {
+		writeLock.lock();
+		readLock.lock();
 		
-		try 
-		{
-			this.stopped = true;
+		try {
+			this.isStopped = true;
 			this.dataStore.close();
 			this.metaHolder.close();
-		}
-		finally 
-		{
-			this.writeLock.unlock();
+		} finally {
+			writeLock.unlock();
+			readLock.unlock();
 		}
 	}
 
-	public long getReadingFileNo() 
-	{
+	public long getReadingFileNo() {
 		return metaHolder.getReadingFileNo();
 	}
 
-	public long getReadingFileOffset() 
-	{
+	public long getReadingFileOffset() {
 		return metaHolder.getReadingFileOffset();
 	}
 
-	public long getWritingFileNo() 
-	{
+	public long getWritingFileNo() {
 		return dataStore.writingFileNo();
 	}
 
-	public long getWritingFileOffset() 
-	{
+	public long getWritingFileOffset() {
 		return dataStore.writingFileOffset();
 	}
 }

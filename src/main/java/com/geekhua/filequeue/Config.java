@@ -3,18 +3,12 @@ package com.geekhua.filequeue;
 import com.geekhua.filequeue.codec.Codec;
 import com.geekhua.filequeue.codec.ObjectCodec;
 
-/**
- * 
- * @author Leo Liang
- */
 public class Config {
 
     private Codec   codec         = new ObjectCodec();
     private String  name          = "default";
     private String  baseDir       = "/data/appdatas/filequeue";
     private int     msgAvgLen     = 1024;
-    private long    readingFileNo = -1L;
-    private long    readingOffset = 0L;
     private long    fileSiz       = 1024 * 1024 * 100L;
     private boolean isBackupReadFile;
 
@@ -24,10 +18,6 @@ public class Config {
 
     public void setBackupReadFile(boolean backupReadFile) {
         this.isBackupReadFile = backupReadFile;
-    }
-
-    public long getFileSiz() {
-        return fileSiz;
     }
 
     public void setFileSiz(long fileSiz) {
@@ -58,25 +48,14 @@ public class Config {
 
     /**
      * 저장될 메시지의 평균 길이를 입력한다.
-     * 평균길이를 활용하여 BlockGroup에서 사용될 버퍼의 크기를 정한다.
-     * @param _msgAvgLen
+     * 평균길이를 활용하여 BlockGroup 에서 사용될 버퍼의 크기를 정한다.
      */
-    public void setMsgAvgLen(int _msgAvgLen) 
-    {
-    	if(_msgAvgLen <= 0)
-    	{
-    		throw new IllegalArgumentException("_msgAvgLen is bigger than zero.(_msgAvgLen > 0)");
+    public void setMsgAvgLen(int msgAvgLen) {
+    	if(msgAvgLen <= 0) {
+    		throw new IllegalArgumentException("msgAvgLen is bigger than zero.(_msgAvgLen > 0)");
     	}
     	
-        this.msgAvgLen = _msgAvgLen;
-    }
-
-    public void setReadingFileNo(long readingFileNo) {
-        this.readingFileNo = readingFileNo;
-    }
-
-    public void setReadingOffset(long readingOffset) {
-        this.readingOffset = readingOffset;
+        this.msgAvgLen = msgAvgLen;
     }
 
     public Codec getCodec() {
@@ -95,30 +74,7 @@ public class Config {
         return msgAvgLen;
     }
 
-    public long getReadingFileNo() {
-        return readingFileNo;
-    }
-
-    public long getReadingOffset() {
-        return readingOffset;
-    }
-
     public long getFileSize() {
         return fileSiz;
     }
-
-	public Config clone() 
-	{
-		Config conf = new Config();
-		conf.setBackupReadFile(this.isBackupReadFile);
-		conf.setBaseDir(this.baseDir);
-		conf.setCodec(this.codec);
-		conf.setFileSiz(this.fileSiz);
-		conf.setMsgAvgLen(this.msgAvgLen);
-		conf.setName(this.name);
-		conf.setReadingFileNo(this.readingFileNo);
-		conf.setReadingOffset(this.readingOffset);
-
-		return conf;
-	}
 }
