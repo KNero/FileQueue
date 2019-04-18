@@ -7,7 +7,7 @@ public class Config {
 
     private Codec   codec         = new ObjectCodec();
     private String  name          = "default";
-    private String  baseDir       = "/data/appdatas/filequeue";
+    private String  baseDir       = "./file_queue";
     private int     msgAvgLen     = 1024;
     private long    fileSiz       = 1024 * 1024 * 100L;
     private boolean isBackupReadFile;

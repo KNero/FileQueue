@@ -25,7 +25,7 @@ import com.geekhua.filequeue.exception.FileQueueClosedException;
  * 
  */
 public class FileQueueImplTest {
-    private static final File baseDir = new File("./fileque");
+    private static final File baseDir = new File("target/fileque");
 
     @Test
     public void testAdd() throws Exception {
@@ -241,9 +241,33 @@ public class FileQueueImplTest {
             fq.add(content);
             fq.get();
         }
-        System.out.println("[ReadWrite]Time spend " + (System.currentTimeMillis() - start) + "ms for " + times
+        System.out.println("[ReadWriteSpeed]Time spend " + (System.currentTimeMillis() - start) + "ms for " + times
                 + " times. Avg msg length 1024bytes, each data file 500MB.");
 
+    }
+
+    @Test
+    public void testReadWrite() throws Exception {
+        Config config = new Config();
+        config.setBaseDir(baseDir.getAbsolutePath());
+        config.setName("testReadWrite");
+
+        long start = System.currentTimeMillis();
+
+        FileQueue<TestObject> fileQueue = new FileQueueImpl<>(config);
+        for (int i = 0; i < 1000; ++i) {
+            fileQueue.add(new TestObject(i, "name-" + i, true, i));
+        }
+
+        for (int i = 0; i < 1000; ++i) {
+            TestObject testObject = fileQueue.get();
+
+            Assert.assertEquals(i, testObject.count);
+            Assert.assertEquals("name-" + i, testObject.name);
+            Assert.assertEquals(i, testObject.pos);
+        }
+
+        System.out.println("[ReadWrite] elapsed: " + (System.currentTimeMillis() - start) + "ms.");
     }
 
     @Test
