@@ -4,7 +4,7 @@ FileQueue
 ```xml
 <repositories>
     <repository>
-        <id>exof-maven</id>
+        <id>knero-maven</id>
         <url>https://github.com/KNero/repository/raw/master/maven</url>
     </repository>
 </repositories>
