@@ -1,14 +1,11 @@
 package com.geekhua.filequeue;
 
+import com.geekhua.filequeue.exception.FileQueueClosedException;
+
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
-import com.geekhua.filequeue.exception.FileQueueClosedException;
-
-public interface FileQueue<E> 
-{
-	E poll() throws InterruptedException, IOException;
-	
+public interface FileQueue<E> {
     E get() throws InterruptedException, IOException;
 
     E get(long timeout, TimeUnit timeUnit) throws InterruptedException, IOException;

@@ -28,46 +28,27 @@ public class FileQueueImpl<E> implements FileQueue<E> {
 		this.dataStore = new DataStoreImpl<>(config, metaHolder.getReadingFileNo(), metaHolder.getReadingFileOffset());
 		this.dataStore.init();
 	}
-	
-	public E poll() throws InterruptedException, IOException {
+
+	/**
+	 * immediately get
+	 */
+	@Override
+	public E get() throws InterruptedException, IOException {
 		this.readLock.lockInterruptibly();
-		
+
 		try {
 			E res = this.dataStore.take();
 			if(res != null) {
 				this.metaHolder.update(dataStore.readingFileNo(), dataStore.readingFileOffset());
 			}
-			
+
 			return res;
 		} finally {
 			this.readLock.unlock();
 		}
 	}
 
-	public E get() throws InterruptedException, IOException {
-		this.readLock.lockInterruptibly();
-		
-		try {
-			while(!isStopped) {
-				E res = dataStore.take();
-
-				if(res != null) {
-					this.metaHolder.update(dataStore.readingFileNo(), dataStore.readingFileOffset());
-					return res;
-				}
-				// Since res == null not only caused by queue empty,
-				// but also last msg not flush to disk completely. We
-				// couldn't wait until not empty like
-				// LinkedBlockingQueue.poll
-				TimeUnit.NANOSECONDS.sleep(1000);
-			}
-
-			return null;
-		} finally {
-			this.readLock.unlock();
-		}
-	}
-
+	@Override
 	public E get(long timeout, TimeUnit unit) throws InterruptedException, IOException {
 		long startNanos = System.nanoTime();
 		long timeoutNanos = unit.toNanos(timeout);
@@ -99,6 +80,7 @@ public class FileQueueImpl<E> implements FileQueue<E> {
 		}
 	}
 
+	@Override
 	public void add(E m) throws IOException, FileQueueClosedException {
 		this.writeLock.lock();
 
@@ -113,6 +95,7 @@ public class FileQueueImpl<E> implements FileQueue<E> {
 		}
 	}
 
+	@Override
 	public void close() throws IOException {
 		writeLock.lock();
 		readLock.lock();
