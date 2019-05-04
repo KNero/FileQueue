@@ -67,9 +67,7 @@ public class FileQueueImplTest {
 					for (int i = 0; i < max / threads; i++) {
 						try {
 							fq.add(new MyObject());
-						} catch (IOException e) {
-							e.printStackTrace();
-						} catch (FileQueueClosedException e) {
+						} catch (IOException | FileQueueClosedException e) {
 							e.printStackTrace();
 						}
 					}
@@ -282,7 +280,6 @@ public class FileQueueImplTest {
 
         final FileQueue<TestObject> fq = new FileQueueImpl<>(config);
         final Set<TestObject> results = Collections.synchronizedSet(new TreeSet<TestObject>());
-
         final Set<TestObject> expected = Collections.synchronizedSet(new TreeSet<TestObject>());
 
         final CountDownLatch startLatch = new CountDownLatch(1);
@@ -326,9 +323,9 @@ public class FileQueueImplTest {
                         e.printStackTrace();
                     }
 
-                    for (int j = 0; j < totalTimes / readerCount; j++) {
+                    for (int j = 0; j < totalTimes / readerCount; ++j) {
                         try {
-                            TestObject m = fq.get();
+                            TestObject m = fq.get(10, TimeUnit.SECONDS);
                             results.add(m);
                         } catch (Exception e) {
                             e.printStackTrace();
@@ -344,6 +341,8 @@ public class FileQueueImplTest {
 
         startLatch.countDown();
         endLatch.await();
+
+        Assert.assertEquals(expected.size(), results.size());
         Assert.assertEquals(expected, results);
     }
 
@@ -405,7 +404,7 @@ public class FileQueueImplTest {
 
                     for (int j = 0; j < totalTimes / readerCount; j++) {
                         try {
-                            TestObject m = fq.get();
+                            TestObject m = fq.get(10, TimeUnit.SECONDS);
                             results.add(m);
                             Thread.sleep(5);
                         } catch (Exception e) {
@@ -422,7 +421,9 @@ public class FileQueueImplTest {
 
         startLatch.countDown();
         endLatch.await();
-        Assert.assertTrue(expected.equals(results));
+
+        Assert.assertEquals(expected.size(), results.size());
+        Assert.assertEquals(expected, results);
     }
 
     @Test
@@ -483,7 +484,7 @@ public class FileQueueImplTest {
 
                     for (int j = 0; j < totalTimes / readerCount; j++) {
                         try {
-                            TestObject m = fq.get();
+                            TestObject m = fq.get(10, TimeUnit.SECONDS);
                             results.add(m);
                         } catch (Exception e) {
                             e.printStackTrace();
@@ -499,7 +500,9 @@ public class FileQueueImplTest {
 
         startLatch.countDown();
         endLatch.await();
-        Assert.assertTrue(expected.equals(results));
+
+        Assert.assertEquals(expected.size(), results.size());
+        Assert.assertEquals(expected, results);
     }
 
 //    @Test
