@@ -127,8 +127,8 @@ public class DataStoreImpl<E> implements DataStore<E> {
      * 전에 사용하던 마지막 큐파일은 더 이상 사용하지 않고 새로운 큐파일을 사용하기 위해 end block 을 쓴다.
      */
     private void closeLastWroteFile() throws IOException {
-        if (writingFileNo.longValue() >= 0) {
-            String fileName = getDataFileName(writingFileNo.longValue());
+        if (writingFileNo.get() >= 0) {
+            String fileName = getDataFileName(writingFileNo.get());
 
             File lastFile = new File(baseDir, fileName);
             if (lastFile.length() % blockSize != 0) {
@@ -150,30 +150,30 @@ public class DataStoreImpl<E> implements DataStore<E> {
 			this.writingFile = null;
 		}
 
-		String newWriteFileName = getDataFileName(this.writingFileNo.incrementAndGet());
+		String newWriteFileName = getDataFileName(writingFileNo.incrementAndGet());
         this.writingFile = new RandomAccessFile(new File(this.baseDir, newWriteFileName), "rw");
 	}
 
 	private void checkReadingFile() {
-		if(readingFileNo.longValue() < 0) {
+		if(readingFileNo.get() < 0) {
 			readingFileNo = new AtomicLong(0);
 			readingOffset.set(0L);
 		}
 
-		File file = new File(baseDir, getDataFileName(readingFileNo.longValue()));
+		File file = new File(baseDir, getDataFileName(readingFileNo.get()));
 		if (!file.exists()) {
 			readingOffset.set(0L);
 		}
 	}
 
 	private void openReadingFile() {
-		if(this.readingFileNo.longValue() >= 0) {
-			String fileName = getDataFileName(this.readingFileNo.longValue());
+		if(readingFileNo.get() >= 0) {
+			String fileName = getDataFileName(readingFileNo.get());
 
 			try {
 				this.readingFile = new RandomAccessFile(new File(baseDir, fileName), "r");
 
-				long readPosition = readingOffset.longValue();
+				long readPosition = readingOffset.get();
 				if(readPosition > 0L) {
 					readingFile.seek(readPosition);
 				}
@@ -240,20 +240,20 @@ public class DataStoreImpl<E> implements DataStore<E> {
 	 * 읽기가 완료된 파일일 경우 백업이 필요하면 백업을 수행하고 새로운 파일을 열고 읽기를 시작한다.
 	 */
 	private E completeReadingFile() throws IOException {
-		if(readingFileNo.longValue() < writingFileNo.longValue()) {
+		if(readingFileNo.get() < writingFileNo.get()) {
 			readingFile.close();
 			readingFile = null;
 
 			if(isBackupReadFile) {
 				try {
-					String fileName = getDataFileName(readingFileNo.longValue());
+					String fileName = getDataFileName(readingFileNo.get());
 					FileUtils.moveFileToDirectory(new File(baseDir, fileName), backDir, true);
 				} catch (IOException e) {
-					String fileName = getDataFileName(readingFileNo.longValue());
+					String fileName = getDataFileName(readingFileNo.get());
 					log.warn("Move file({}) to dir({}) fail.", new File(baseDir, fileName), backDir);
 				}
 			} else {
-				String fileName = getDataFileName(readingFileNo.longValue());
+				String fileName = getDataFileName(readingFileNo.get());
 				FileUtils.deleteQuietly(new File(baseDir, fileName));
 			}
 
@@ -299,7 +299,7 @@ public class DataStoreImpl<E> implements DataStore<E> {
 			try {
 				this.readingFile.close();
 			} catch (IOException e) {
-				log.error("Close reading file({}) fail.", getDataFileName(readingFileNo.longValue()), e);
+				log.error("Close reading file({}) fail.", getDataFileName(readingFileNo.get()), e);
 			}
 		}
 
@@ -307,7 +307,7 @@ public class DataStoreImpl<E> implements DataStore<E> {
 			try {
 				this.writingFile.close();
 			} catch (IOException e) {
-				log.error("Close reading file({}) fail.", getDataFileName(writingFileNo.longValue()));
+				log.error("Close reading file({}) fail.", getDataFileName(writingFileNo.get()));
 			}
 		}
 
