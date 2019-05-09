@@ -502,6 +502,27 @@ public class FileQueueImplTest {
         Assert.assertEquals(expected, results);
     }
 
+    /**
+     * 빈 큐파일을 닫고 열 경우 readingFileNo 가 업데이트 되지 않아
+     * 다시 파일을 열 경우 계속해서 그 전 파일을 찾는 현상 테스트
+     */
+    @Test
+    public void emptyFileClose() throws Exception {
+        Config config = new Config();
+        config.setBaseDir(baseDir.getAbsolutePath());
+        config.setName("readEmptyFile");
+
+        FileQueue<String> q;
+
+        for (int i = 0; i < 5; ++i) {
+            q = new FileQueueImpl<>(config);
+            q.get();
+            q.close();
+
+            Thread.sleep(1000);
+        }
+    }
+
 //    @Test
     public void stressTest() throws Exception {
         final int writerCount = 20;
@@ -640,5 +661,4 @@ public class FileQueueImplTest {
         }
 
     }
-
 }
