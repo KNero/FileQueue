@@ -20,10 +20,7 @@ import org.junit.Test;
 import com.geekhua.filequeue.codec.MyObject;
 import com.geekhua.filequeue.exception.FileQueueClosedException;
 
-/**
- * @author Leo Liang
- * 
- */
+
 public class FileQueueImplTest {
     private static final File baseDir = new File("target/fileque");
 

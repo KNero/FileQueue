@@ -2,6 +2,8 @@ package com.geekhua.filequeue.datastore;
 
 import com.geekhua.filequeue.Config;
 import com.geekhua.filequeue.codec.Codec;
+import com.geekhua.filequeue.meta.MetaHolder;
+import com.geekhua.filequeue.meta.MetaHolderImpl;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
@@ -39,20 +41,21 @@ public class DataStoreImpl<E> implements DataStore<E> {
 	private AtomicLong writingFileNo = new AtomicLong(-1L);
 	private RandomAccessFile writingFile = null;
 
-	public DataStoreImpl(Config config, long readingFileNo, long readingOffset) {
+	private MetaHolder metaHolder;
+
+	public DataStoreImpl(Config config) {
 		String name = config.getName();
-		this.baseDir = new File(new File(config.getBaseDir(), name), DATAFILE_DIRNAME);
+		baseDir = new File(new File(config.getBaseDir(), name), DATAFILE_DIRNAME);
 
 		final byte[] endContent = new byte[] {(byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAA, (byte) 0xAB};
-		this.blockSize = BlockGroup.estimateBlockGroupSize(config.getMsgAvgLen());
+		blockSize = BlockGroup.estimateBlockGroupSize(config.getMsgAvgLen());
 		endBlock = BlockGroup.allocate(endContent, blockSize).array();
 
-		this.readingFileNo = new AtomicLong(readingFileNo);
-		this.readingOffset = new AtomicLong(readingOffset);
-		this.codec = config.getCodec();
-		this.maxFileSize = config.getFileSize();
-		this.isBackupReadFile = config.isBackupReadFile();
-		this.backDir = new File(new File(config.getBaseDir(), name), DATAFILE_BACK_DIR);
+		metaHolder = new MetaHolderImpl(config.getName(), config.getBaseDir());
+		codec = config.getCodec();
+		maxFileSize = config.getFileSize();
+		isBackupReadFile = config.isBackupReadFile();
+		backDir = new File(new File(config.getBaseDir(), name), DATAFILE_BACK_DIR);
 	}
 
     private static String getDataFileName(long fileNo) {
@@ -69,6 +72,10 @@ public class DataStoreImpl<E> implements DataStore<E> {
     }
 
 	public void init() throws IOException {
+		metaHolder.init();
+		readingFileNo = new AtomicLong(metaHolder.getReadingFileNo());
+		readingOffset = new AtomicLong(metaHolder.getReadingFileOffset());
+
 		createBaseDirIfNeeded();
 		createBakDirIfNeeded();
 		findLastWroteFileNo();
@@ -196,12 +203,12 @@ public class DataStoreImpl<E> implements DataStore<E> {
 				log.error("Fail to write file. So new file created. file size % block size != 0. file size:{}, block size:{}", writingFileSize, blockSize);
 
 				createNewWriteFile();
-			} else if(this.writingFile.length() >= this.maxFileSize) {
+			} else if(writingFile.length() >= maxFileSize) {
 				createNewWriteFile();
 			}
 
-			BlockGroup blockGroup = BlockGroup.allocate(content, this.blockSize);
-			this.writingFile.write(blockGroup.array());
+			BlockGroup blockGroup = BlockGroup.allocate(content, blockSize);
+			writingFile.write(blockGroup.array());
 		}
 	}
 
@@ -209,8 +216,8 @@ public class DataStoreImpl<E> implements DataStore<E> {
 	public E take() throws IOException {
 		BlockGroup blockGroup = null;
 
-		if(this.readingFileNo.longValue() >= 0) {
-			blockGroup = BlockGroup.read(this.readingFile, this.blockSize);
+		if(readingFileNo.longValue() >= 0) {
+			blockGroup = BlockGroup.read(readingFile, blockSize);
 			
 			// 읽은 데이터(blockGroup)이 파일의 마지막이라면 readingFile 을 삭제하거나 백업한다.
 			boolean isEndFile = blockGroup != null && ArrayUtils.isEquals(blockGroup.array(), endBlock);
@@ -222,7 +229,9 @@ public class DataStoreImpl<E> implements DataStore<E> {
 		if(blockGroup == null) {
 			return null;
 		} else {
-			this.readingOffset.set(this.readingFile.getFilePointer());
+			readingOffset.set(readingFile.getFilePointer());
+			metaHolder.update(readingFileNo.get(), readingOffset.get());
+
 			return (E)codec.decode(blockGroup.getContent());
 		}
 	}
@@ -231,27 +240,28 @@ public class DataStoreImpl<E> implements DataStore<E> {
 	 * 읽기가 완료된 파일일 경우 백업이 필요하면 백업을 수행하고 새로운 파일을 열고 읽기를 시작한다.
 	 */
 	private E completeReadingFile() throws IOException {
-		if(this.readingFileNo.longValue() < writingFileNo.longValue()) {
-			this.readingFile.close();
-			this.readingFile = null;
+		if(readingFileNo.longValue() < writingFileNo.longValue()) {
+			readingFile.close();
+			readingFile = null;
 
-			if(this.isBackupReadFile) {
+			if(isBackupReadFile) {
 				try {
-					String fileName = getDataFileName(this.readingFileNo.longValue());
+					String fileName = getDataFileName(readingFileNo.longValue());
 					FileUtils.moveFileToDirectory(new File(baseDir, fileName), backDir, true);
 				} catch (IOException e) {
-					String fileName = getDataFileName(this.readingFileNo.longValue());
+					String fileName = getDataFileName(readingFileNo.longValue());
 					log.warn("Move file({}) to dir({}) fail.", new File(baseDir, fileName), backDir);
 				}
 			} else {
-				String fileName = getDataFileName(this.readingFileNo.longValue());
+				String fileName = getDataFileName(readingFileNo.longValue());
 				FileUtils.deleteQuietly(new File(baseDir, fileName));
 			}
 
-			this.readingFileNo.incrementAndGet();
-			this.readingOffset.set(0L);
+			readingFileNo.incrementAndGet();
+			readingOffset.set(0L);
+			metaHolder.update(readingFileNo.get(), readingOffset.get());
 
-			this.openReadingFile();
+			openReadingFile();
 
 			return take();
 		}
@@ -259,19 +269,23 @@ public class DataStoreImpl<E> implements DataStore<E> {
 		return null;
 	}
 
+	@Override
 	public long readingFileOffset() {
-		return this.readingOffset.longValue();
+		return this.readingOffset.get();
 	}
 
+	@Override
 	public long readingFileNo() {
-		return this.readingFileNo.longValue();
+		return this.readingFileNo.get();
 	}
 
+	@Override
 	public long writingFileNo()
 	{
 		return writingFileNo.get();
 	}
 
+	@Override
 	public long writingFileOffset() {
 		try {
 			return writingFile.getFilePointer();
@@ -285,7 +299,7 @@ public class DataStoreImpl<E> implements DataStore<E> {
 			try {
 				this.readingFile.close();
 			} catch (IOException e) {
-				log.warn("Close reading file({}) fail.", getDataFileName(readingFileNo.longValue()));
+				log.error("Close reading file({}) fail.", getDataFileName(readingFileNo.longValue()), e);
 			}
 		}
 
@@ -293,7 +307,15 @@ public class DataStoreImpl<E> implements DataStore<E> {
 			try {
 				this.writingFile.close();
 			} catch (IOException e) {
-				log.warn("Close reading file({}) fail.", getDataFileName(writingFileNo.longValue()));
+				log.error("Close reading file({}) fail.", getDataFileName(writingFileNo.longValue()));
+			}
+		}
+
+		if (metaHolder != null) {
+			try {
+				metaHolder.close();
+			} catch (IOException e) {
+				log.error("File to meta file close.", e);
 			}
 		}
 	}
