@@ -13,7 +13,7 @@ FileQueue
 <dependency>
     <groupId>team.balam</groupId>
     <artifactId>file-queue</artifactId>
-    <version>0.0.2</version>
+    <version>0.0.3</version>
 </dependency>
 ```
 ## Gradle
@@ -29,6 +29,6 @@ repositories {
 ```
 ```gradle
 dependencies {
-    compile 'team.balam:file-queue:0.0.2'
+    compile 'team.balam:file-queue:0.0.3'
 }
 ```
